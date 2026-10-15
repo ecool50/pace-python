@@ -1028,7 +1028,8 @@ ColumnMajor single_frame_focal_blocks(const IntColumn& focal_code, int n_focals,
 PYBIND11_MODULE(_core, m) {
   m.doc() = "PACE compiled core";
   m.def("mash", &mash, py::arg("bhat"), py::arg("shat"),
-        py::arg("v") = ColumnMajor({0, 0}), py::arg("null_weight") = 10.0,
+        py::arg("v") = ColumnMajor(std::vector<py::ssize_t>{0, 0}),
+        py::arg("null_weight") = 10.0,
         py::arg("grid_mult") = 1.4142135623730951, py::arg("max_iterations") = 200000,
         py::arg("tolerance") = 1e-13,
         py::arg("condition_names") = std::vector<std::string>(),
