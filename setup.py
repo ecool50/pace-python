@@ -45,7 +45,7 @@ def eigen_include():
 
 
 def check_eigen_version(include_dir):
-    """Warn if Eigen is not 3.4.
+    """Refuse to build against anything but Eigen 3.4.
 
     The version is not cosmetic: a fit built against Eigen 5.0.1 differs from
     the R package's by about 3e-4 in the random effects, because the majors
@@ -78,10 +78,27 @@ def check_eigen_version(include_dir):
         return
     version = "%s.%s.%s" % (found.get("WORLD", "?"), found.get("MAJOR", "?"),
                             found.get("MINOR", "?"))
-    print("WARNING: building against Eigen %s. PACE reproduces the R package's "
-          "fits bit-for-bit only with Eigen 3.4; expect differences around 3e-4 "
-          "in the random effects. Set EIGEN_INCLUDE_DIR to an Eigen 3.4 tree."
-          % version)
+    message = (
+        "this build found Eigen %s, and PACE reproduces the R package's fits "
+        "bit-for-bit only with Eigen 3.4: against another major the random "
+        "effects move by about 3e-4, which is far larger than anything else "
+        "that separates the two languages.\n\n"
+        "Point the build at a 3.4 tree:\n"
+        "    curl -fsSLO https://gitlab.com/libeigen/eigen/-/archive/3.4.0/"
+        "eigen-3.4.0.tar.gz && tar xzf eigen-3.4.0.tar.gz\n"
+        "    EIGEN_INCLUDE_DIR=$PWD/eigen-3.4.0 pip install .\n"
+        "or, where R is installed, reuse RcppEigen's copy:\n"
+        "    EIGEN_INCLUDE_DIR=$(Rscript -e \'cat(system.file(\"include\", "
+        "package=\"RcppEigen\"))\') pip install .\n\n"
+        "Set PACE_ALLOW_ANY_EIGEN=1 to build anyway, accepting that the fits "
+        "will not match the R package." % version)
+    # An error, not a warning. A warning scrolls past in pip's output and the
+    # package then quietly answers differently from the thing it claims to
+    # reproduce, which is the one failure that would not announce itself.
+    if os.environ.get("PACE_ALLOW_ANY_EIGEN") == "1":
+        print("WARNING: " + message)
+        return
+    raise SystemExit("ERROR: " + message)
 
 # setuptools rejects absolute paths in `sources`, so the core is referenced
 # relative to this file. It still compiles the one shared copy; nothing is

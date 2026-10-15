@@ -1,0 +1,16 @@
+# setup.py names the core's .cpp files as sources, so sdist picks those up on
+# its own. The headers it does not, and without them the sdist cannot compile:
+# `pip install pace-spatial` would fail at the first #include. The manifest is
+# what makes a source install work at all.
+include LICENSE
+include README.md
+include src/core/*.hpp
+include src/core_manifest.json
+include pace/py.typed
+
+# The test fixtures are R's own fits and run to megabytes. Tests run from a
+# git checkout, where CI runs them; shipping them in every sdist is weight
+# nobody installing the package needs.
+prune tests
+prune examples
+prune tools
