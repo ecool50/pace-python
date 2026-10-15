@@ -82,19 +82,33 @@ print(drivers["Macrophage", "Tumour"].to_dataframe()
       .round(4).to_string(index=False))
 
 # --- the figures -----------------------------------------------------------
+# Each panel on its own, and all four as one multi-page PDF. PdfPages keeps
+# every page vector rather than stitching rasters together.
+from matplotlib.backends.backend_pdf import PdfPages
+
+figures = []
+
 full, zoom = pace.plot_decomposition(frame)
-full.figure.savefig(OUT / "py_decomposition.pdf", bbox_inches="tight")
+figures.append((full.figure, "py_decomposition.pdf"))
 
 axis = pace.plot_pair_heatmap(pairs, cell_types=fit.cell_types)
-axis.figure.tight_layout()
-axis.figure.savefig(OUT / "py_pairheatmap.pdf", bbox_inches="tight")
+figures.append((axis.figure, "py_pairheatmap.pdf"))
 
 left, right = pace.plot_drivers(drivers, "Macrophage", "Tumour", single_frame=frame)
-left.figure.tight_layout()
-left.figure.savefig(OUT / "py_drivers.pdf", bbox_inches="tight")
+figures.append((left.figure, "py_drivers.pdf"))
 
 panels = pace.plot_proximity(fit, counts, ["MRC1", "APOC1"], "Macrophage", "Tumour")
-panels[0].figure.tight_layout()
-panels[0].figure.savefig(OUT / "py_proximity.pdf", bbox_inches="tight")
+figures.append((panels[0].figure, "py_proximity.pdf"))
 
-print("\nwrote", ", ".join(sorted(p.name for p in OUT.glob("py_*.pdf"))))
+for figure, name in figures:
+    figure.savefig(OUT / name, bbox_inches="tight")
+
+combined = OUT / "pace_python_figures.pdf"
+with PdfPages(combined) as pdf:
+    pdf.infodict().update(Title="PACE for Python: breast cancer Xenium crop",
+                          Subject="Figures from examples/demo.py")
+    for figure, _ in figures:
+        pdf.savefig(figure, bbox_inches="tight")
+
+print("\nwrote", ", ".join(name for _, name in figures))
+print("combined into", combined.name, f"({len(figures)} pages)")
