@@ -41,6 +41,14 @@ CROSS_ARCH_FLOOR = 0.0 if ON_REFERENCE_ARCH else 2e-3
 WHERE = f"{sys.platform}/{MACHINE}"
 
 
-def tol(atol):
-    """The tolerance for a comparison whose exact-build tolerance is `atol`."""
-    return max(atol, CROSS_ARCH_FLOOR)
+def tol(atol, scale=1.0):
+    """The tolerance for a comparison whose exact-build tolerance is `atol`.
+
+    `scale` is the natural magnitude of what is being compared, so that one
+    knob expresses the difference in each quantity's own units. The variance
+    components are order one and take the default; a percentage runs to a
+    hundred, and the same relative difference there is a hundred times
+    larger in absolute terms. Without it the floor is tight by two orders of
+    magnitude on exactly those columns.
+    """
+    return max(atol, CROSS_ARCH_FLOOR * scale)

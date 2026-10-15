@@ -83,7 +83,8 @@ def test_every_variance_block_matches_rs(case):
 def test_the_percentages_match_rs(case):
     tag, decomposition = case
     reference = np.column_stack([vec(f"{tag}_pct_{key}.txt") for key in PERCENT_KEYS])
-    np.testing.assert_allclose(decomposition.pct, reference, rtol=0, atol=tol(1e-04))
+    np.testing.assert_allclose(decomposition.pct, reference, rtol=0,
+                               atol=tol(1e-04, scale=100))
 
 
 def test_the_contamination_flag_matches_rs(case):
@@ -98,7 +99,7 @@ def test_the_per_focal_aggregates_match_rs(case, weighting):
     table = {"mean": decomposition.mean_table, "specw": decomposition.specw_table,
              "pooled": decomposition.pooled_table}[weighting]
     reference = vec(f"{tag}_agg_{weighting}.txt").reshape(table.shape, order="F")
-    np.testing.assert_allclose(table, reference, rtol=0, atol=tol(1e-05))
+    np.testing.assert_allclose(table, reference, rtol=0, atol=tol(1e-05, scale=100))
 
 
 def test_the_index_matrices_are_not_read_transposed(counts):
@@ -187,7 +188,7 @@ def test_the_within_type_split_matches_rs(single_frame):
     for field, fixture in [("pct_spatial", "Spatial"), ("pct_spill", "Spillover"),
                            ("pct_residual", "Residual")]:
         np.testing.assert_allclose(getattr(frame, field), vec(f"{tag}_{fixture}.txt"),
-                                   rtol=0, atol=tol(1e-04), err_msg=field)
+                                   rtol=0, atol=tol(1e-04, scale=100), err_msg=field)
 
 
 def test_only_a_condition_fit_has_a_responder_share(single_frame):
