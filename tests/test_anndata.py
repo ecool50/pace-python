@@ -139,7 +139,9 @@ def test_three_dimensional_coordinates_are_refused_not_projected(adata):
 def test_a_missing_label_stays_missing_rather_than_becoming_a_type(adata):
     """`.astype(str)` would make this a cell type called "nan"."""
     holed = adata.copy()
-    labels = holed.obs["cellType"].astype(object).to_numpy()
+    # copy=True: pandas may hand back a read-only view, and writing to it
+    # raises rather than editing the labels
+    labels = holed.obs["cellType"].astype(object).to_numpy(copy=True)
     labels[11] = np.nan
     holed.obs["cellType"] = labels
     with pytest.raises(ValueError, match="every cell needs a cell type"):

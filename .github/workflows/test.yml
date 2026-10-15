@@ -20,7 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # ubuntu-24.04-arm is here to separate two things the other two
+        # runners confound: x86-64 Linux differs from the stored fixtures by
+        # about 2e-4, and arm64 macOS does not. Architecture and compiler
+        # change together between them. arm64 + g++ tells us which one matters.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
         python: ["3.10", "3.12"]
 
     steps:
