@@ -12,3 +12,6 @@ examples/*.png
 examples/*.pdf
 
 # the vendored core and its manifest ARE tracked: see tools/sync_core.py
+eigen-3.4.0/
+eigen.tar.gz
+wheelhouse/

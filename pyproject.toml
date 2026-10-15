@@ -45,3 +45,24 @@ pace = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Wheels, so that installing PACE does not mean compiling it. Eigen is fetched
+# and pinned at 3.4.0 by tools/fetch_eigen.sh: see that script for why the
+# version is not negotiable.
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
+# musl and the minority architectures are not worth the build minutes until
+# someone asks; 32-bit cannot hold a real cohort anyway.
+skip = "*-musllinux_* *_i686 *_ppc64le *_s390x pp*"
+before-all = "bash tools/fetch_eigen.sh"
+environment = { EIGEN_INCLUDE_DIR = "$(pwd)/eigen-3.4.0" }
+# A wheel that imports and fits is the least that should be checked; the full
+# suite needs the fixtures, which the sdist deliberately leaves out.
+test-requires = ["pytest", "pandas", "anndata", "matplotlib"]
+test-command = "python -c \"import pace, numpy as np; from scipy.sparse import csc_matrix; r=np.random.default_rng(0); n=300; print(pace.pace_fit(csc_matrix(r.poisson(2,size=(n,10)).astype(float)), r.uniform(0,200,n), r.uniform(0,200,n), r.choice(['A','B'],n), n_threads=1))\""
+
+[tool.cibuildwheel.macos]
+# The R package needs Apple's toolchain and so does this: a Homebrew or conda
+# clang drags in an old ld64 that links an unloadable extension.
+environment = { EIGEN_INCLUDE_DIR = "$(pwd)/eigen-3.4.0", MACOSX_DEPLOYMENT_TARGET = "11.0" }
+archs = ["x86_64", "arm64"]
