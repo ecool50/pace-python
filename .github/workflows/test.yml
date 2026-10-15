@@ -42,4 +42,11 @@ jobs:
           python -m pip install ".[test]" -v
 
       - name: Test
-        run: python -m pytest tests -q
+        # From outside the checkout, deliberately. The repository root holds
+        # the source package `pace/`, which shadows the installed one on
+        # sys.path but carries no compiled _core in a fresh clone, so pytest
+        # run from there dies at import with a misleading "circular import".
+        # Running from elsewhere also means the tests exercise what a user
+        # actually installs rather than the working tree.
+        working-directory: ${{ runner.temp }}
+        run: python -m pytest "$GITHUB_WORKSPACE/tests" -q

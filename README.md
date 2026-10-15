@@ -255,8 +255,19 @@ The other three functions take fitted output and summarise it.
 ## Tests
 
 ```sh
-python -m pytest python/tests
+python -m pytest tests
 ```
+
+That works once the extension is built in place (`pip install -e .` does it).
+From a non-editable install, run the tests from outside the checkout:
+
+```sh
+cd /tmp && python -m pytest /path/to/pace-python/tests
+```
+
+The repository root holds the source package `pace/`, which shadows the
+installed one but has no compiled `_core` in it, and the resulting ImportError
+blames a circular import rather than the real cause.
 
 The mash tests hold the bindings to the same target as the R package: every
 neighbour slice of both canonical cohorts, compared gene by gene against mashr
