@@ -1,385 +1,254 @@
 # PACE for Python
 
-PACE for Python. Nothing here reimplements the method: the extension compiles
-the same C++ translation units the R package compiles, so the two cannot drift
-apart on arithmetic.
+**Proximity-associated changes in expression**, for imaging spatial
+transcriptomics such as Xenium and CosMx.
 
-The R package lives at [ecool50/PACE](https://github.com/ecool50/PACE), and is
-where the core is owned and changed. This repository vendors a copy of it under
-`src/core/`, synced with `tools/sync_core.py`.
+PACE asks a directed question of spatial data: *when a macrophage sits next to
+tumour cells, which of its genes change, and by how much?* It fits a
+hierarchical negative binomial mixed model in which every focal-neighbour
+relationship borrows strength from the others, so noisy pairs are pulled
+towards the consensus rather than reported as discoveries. A per-cell
+contamination term absorbs the short-range ambient signal that leaks between
+adjacent cells through segmentation error, so what comes back is a change in
+the cell's own expression rather than its neighbour's transcripts landing in
+it.
 
-## Keeping the core in step
-
-Vendoring is the one risk of keeping the two packages apart, so it is made
-visible rather than left to trust:
-
-```sh
-python tools/sync_core.py ../PACE     # copy the core in, record what came
-python -m pytest tests                # and prove it still reproduces R
-```
-
-`sync_core.py` writes `src/core_manifest.json`, a sha256 per file plus the
-upstream commit. `tests/test_core_sync.py` fails if a vendored file is edited
-here, which catches the accident. The guard that matters, though, is the rest
-of the suite: the fixtures are R's own fits, so a core that stops reproducing
-them fails loudly. Change the core in the R repository and sync; never edit
-`src/core/` here.
-
-## Install
+This is the Python implementation. It is not a reimplementation: it compiles
+the same C++ core as the [Bioconductor package](https://github.com/ecool50/PACE)
+and reproduces its fits bit for bit.
 
 ```sh
-pip install -e python/            # fitting and every readout
-pip install -e "python/[all]"     # plus AnnData, pandas tables and plotting
+pip install pace-spatial          # fitting and every readout
+pip install "pace-spatial[all]"   # plus AnnData, pandas tables and plotting
 ```
 
-`numpy` and `scipy` are all that fitting needs. `anndata`, `pandas` and
-`matplotlib` are optional extras, imported only when you reach for the thing
-that uses them.
+> Not released yet. Until the first version is on PyPI, install from a clone:
+> `pip install -e ".[all]"`, and read **Building from source** below first —
+> the Eigen version is not a free choice.
 
-### macOS: pin the toolchain
+`numpy` and `scipy` are all a fit needs. `anndata`, `pandas` and `matplotlib`
+are optional, imported only when you reach for the thing that uses them.
 
-A conda or Homebrew `clang` usually brings an old `ld64` along with it, and an
-old `ld64` links a shared object that loads nowhere:
-
-```
-ImportError: dlopen(...): mis-aligned LINKEDIT string pool
-```
-
-The build succeeds, so this only shows up at import. Use Apple's toolchain:
-
-```sh
-CC=/usr/bin/clang CXX=/usr/bin/clang++ \
-  LDSHARED="/usr/bin/clang -bundle -undefined dynamic_lookup" \
-  pip install -e python/
-```
-
-`ld -v` should report `PROJECT:ld-27037` or newer. `ld64-530` is the one that
-fails. The R package has the same requirement for the same reason.
-
-### Pin Eigen to 3.4
-
-The core's solver uses Eigen, which the R package gets from RcppEigen. A Python
-build needs it separately, and the version is not a free choice: against Eigen
-3.5 the random effects move by about 3e-4, so the two languages no longer agree.
-The build warns when it picks up anything but 3.4.
-
-Wherever R is installed, RcppEigen is already a 3.4 tree:
-
-```sh
-EIGEN_INCLUDE_DIR=$(Rscript -e 'cat(system.file("include", package="RcppEigen"))') \
-  pip install -e python/
-```
-
-## What is bound so far
-
-| function | does |
-|---|---|
-| `mash` | canonical multivariate adaptive shrinkage for one neighbour slice |
-| `driver_scores` | per-gene driver scores for one focal-neighbour pair |
-| `pair_variance_pratt` | Pratt attribution of spatial variance across neighbours |
-| `neighbour_kernels` | Gaussian and technical neighbour kernels from coordinates |
-| `ambient_field` | sparse cross-type contamination field, compressed-column |
-| `random_design_block` | one block of the random-effect design, plus the grouping |
-| `fit_irls` | the penalised quasi-likelihood loop: the fit itself |
-| `sparse_product` | sparse-sparse product, in the core's summation order |
-| `pace_fit` | every stage above, in order: counts and coordinates to a fit |
-| `fit_anndata` | the same, reading an `AnnData` |
-| `pace_shrink` | multivariate adaptive shrinkage of the fitted slopes |
-| `pace_decompose` | the per-gene, per-cell-type variance decomposition |
-| `single_frame_decomposition` | the observed decomposition R reports |
-| `pace_drivers` | per-pair driver tables, ranked |
-| `pair_variance` | each neighbour's share of a focal type's variance |
-| `plot_*` | the figures: decomposition, pair heatmap, drivers, proximity, shrinkage |
-| `fit_statistics` | the per-cell-type summaries the readouts are built on |
-
-`pace_fit()` runs the whole pipeline from counts, coordinates and cell type
-labels, and reproduces `paceModel()` bit for bit: every one of the 20,016
-random effects on the packaged breast cancer subset, and every dispersion.
-The caveat is the trigamma function, which R takes from its own math library
-and the core computes itself; the two agree to 1.8e-15, which thirteen IRLS
-iterations amplify to 8e-07 in the fitted effects. Against an R build using the
-core's trigamma, nothing differs at all.
+## Quickstart
 
 ```python
 import pace
 
-fit = pace.fit_anndata(adata, "cell_type")             # from an AnnData
-fit = pace.pace_fit(counts, x, y, cell_type)           # or from arrays
-fit.U[fit.row_names.index("Macrophage::Tumour")]
-```
-
-`fit_anndata()` reads the coordinates from `obsm["spatial"]`, the labels from
-`obs`, the gene names from `var_names`, and the counts from `X` or a `layer`.
-It never modifies the object, and `anndata` is not a dependency: it uses only
-the attributes an `AnnData` exposes, so anything shaped like one works.
-
-It checks that the counts are counts, which is the one thing the R package
-never has to: `counts(spe)` names the assay it wants, whereas `adata.X` holds
-whatever the last preprocessing step left there. A negative binomial fit of
-log-normalised values converges and reports slopes that mean nothing, so
-non-integer values are refused rather than fitted. Point `layer` at the raw
-counts, usually `layer="counts"`.
-
-It also normalises a sparse matrix that is not in canonical form. scipy will
-hand over a CSC holding duplicate entries for one `(cell, gene)`, and the
-solver reads stored entries one at a time, so those count twice: such a matrix
-can be elementwise identical to a good one, hold none but non-negative
-integers, give the same library sizes, and still fit 30% wrong. R is safe from
-this only because `Matrix` refuses the object outright. Prefer a sparse `X`:
-a dense one is converted here, at about six times its own size at peak.
-
-Two things to know before comparing a Python fit to an R one row by row:
-
-**Cell type order.** `types=None` sorts the observed labels, which is Python's
-byte order. R sorts under `LC_COLLATE`, so a label set mixing cases orders
-differently: R puts `epithelial` before `T-NK`, Python after. The fit is
-equivariant under a permutation of types, so the biology is unchanged, but the
-row order is not. Pass `types=` to match a given R fit, as you would in R.
-
-**Neighbour scope.** `kernel_per_image` defaults to `False`, as R's does: even
-with several images the neighbour search is global, which is what a cohort of
-fields of view from one section wants. Set it `True` when the images are
-separate samples. The contamination field is per-image either way.
-
-**Condition cohorts.** Name the reference arm. Unlike the cell type order,
-which only relabels the output, the condition's first level is what every other
-arm is contrasted against: it sets what the baseline neighbour slopes mean and
-which way the interaction points. R chooses it by locale collation and Python
-would choose it by byte order, and the two disagree on labels as ordinary as
-`{"Responder", "non-responder"}` -- where the fitted slopes then differ by 2
-rather than being reordered. Leaving `condition_levels` unset warns for exactly
-that reason.
-
-A numeric or boolean condition is refused: R would model such a column
-continuously, where treatment contrasts give a dummy per level, and the two are
-different fits.
-
-Pass `condition_key` (or `condition=` and
-`condition_name=` for arrays) and the model gains a condition main effect in
-the fixed design and a condition-by-neighbour interaction in the random-effect
-block, which is the responder layer: `~ 1 + condition * (types)` over
-`~ 1 + condition`, as in R. The terms take their prefix from the column name,
-so a column `Responder` with levels PD and PR gives `ResponderPR` and
-`ResponderPR:Tumour`, and a Categorical's category order is honoured as R
-honours a factor's. Checked against R on a two-level and a three-level
-condition; the three-level case is the one that pins the column order, since
-`model.matrix()` varies the condition level fastest within each type.
-
-**Large cohorts.** `ambient_mode="stream"` keeps only the contamination weight
-matrix and recomputes each chunk's columns from it, instead of materialising
-the whole cells-by-genes ambient product. On a million cells by five thousand
-genes that product alone runs to several GB. It is a memory knob and nothing
-else: on the packaged crop the streamed fit is bit-identical to the cached one,
-coefficients, dispersions and contamination loadings alike, because cache mode
-forms its product with the same routine and the two differ only in chunking.
-
-## Shrinking the slopes
-
-A fitted slope on its own is mostly noise. `pace_shrink()` pools them the way
-R's `paceShrink()` does: one mash fit per neighbour, with the focal cell types
-as its conditions, over a single gene set shared by every slice so that one
-lfsr cut means the same thing across them.
-
-```python
-slopes = pace.pace_shrink(fit, null_correlation=False)
-slopes.calls()                      # how many effects, and how many wrong signs
-frame = slopes.to_dataframe()       # pandas, imported only if you ask for this
-frame.nsmallest(10, "lfsr")[["gene", "focal", "neighbour", "estimate_shrunk"]]
-```
-
-On the packaged subset this calls the **same gene-focal pairs** as R, not merely
-the same number of them, under both `null_correlation` settings. Three things
-to know:
-
-- The mixture is the compiled core's, which reproduces mashr's canonical
-  covariances but not the data-driven ones, so this is R at
-  `data_driven = FALSE`. On the two canonical cohorts that costs 11 of 1,637
-  breast cancer calls and none of 46 melanoma ones.
-- `null_correlation` defaults to `True`, as R's does. The published breast
-  cancer counts were produced with `False`, so pass `False` to match them.
-- On a condition fit the slopes shrunk are `<resp_term>:<neighbour>`, so what
-  comes back is the **responder layer and not the baseline proximity effect**.
-  That is R's behaviour, and `resp_term` defaults to the condition's last level
-  either way.
-
-R's table arrives in alphabetical gene order, an artifact of its splitting the
-long frame by gene; Python keeps the fit's gene order. Sort if you are comparing
-row by row.
-
-## Decomposing the variance
-
-`pace_decompose()` splits each gene's fitted variance, for each focal cell
-type, into five blocks: the cell type's own offset, the baseline spatial state
-(the neighbour slopes), the responder spatial state (their interaction with a
-condition), the contamination, and what the dispersion accounts for.
-
-```python
-decomposition = pace.pace_decompose(fit, counts)
-decomposition.aggregates("specw")        # per focal type, specificity-weighted
-decomposition.to_dataframe()             # per (focal, gene)
-```
-
-It matches R's five-block table and all three of its aggregate weightings. The
-fitted means it needs are not stored on a fit -- on a real cohort they are a
-dense cells-by-genes matrix -- so they are rebuilt a gene block at a time, which
-is what R does too; `fit_statistics()` exposes that step if you want it
-separately.
-
-`single_frame_decomposition()` gives the other table, the one R's
-`varianceDecomposition()` actually returns:
-
-```python
-frame = pace.single_frame_decomposition(fit, counts)
-frame.by_focal()            # one row per focal type, sum-of-squares weighted
-```
-
-Here the magnitudes are **observed** rather than fitted -- the cell-type share
-is the between-type sum of squares of `log1p(CP10k)` -- and only the split of
-what remains inside a cell type comes from the model. That is why its
-percentages differ from the five-block ones, and why its observed columns match
-R to 1e-11 while the fitted split matches to the trigamma floor. The five-block
-table above is what sits underneath it, reached in R as
-`fit@varianceDecomposition$blocks$gene_focal_5block`.
-
-
-`ambient_field()` returns compressed-column arrays rather than a matrix, so
-nothing here depends on scipy:
-
-```python
-from scipy.sparse import csc_matrix
-f = pace.ambient_field(x, y, cell_type, image, n_images=1)
-W = csc_matrix((f["data"], f["indices"], f["indptr"]), shape=f["shape"])
-```
-The other three functions take fitted output and summarise it.
-
-## Tests
-
-```sh
-python -m pytest tests
-```
-
-That works once the extension is built in place (`pip install -e .` does it).
-From a non-editable install, run the tests from outside the checkout:
-
-```sh
-cd /tmp && python -m pytest /path/to/pace-python/tests
-```
-
-The repository root holds the source package `pace/`, which shadows the
-installed one but has no compiled `_core` in it, and the resulting ImportError
-blames a circular import rather than the real cause.
-
-### How exactly the fits match R, and where
-
-Bit-identity is a property of a build, not of the package, and CI measures all
-three cases:
-
-| build | against R's fixtures |
-|---|---|
-| arm64 macOS, Apple clang (the reference) | **bit-identical** |
-| arm64 Linux, g++ | every tolerance test passes; exact equality lost |
-| x86-64 Linux, g++ | agrees to about 2.7e-4 |
-
-Eigen vectorises and reduces in a different order on x86-64, and thirteen IRLS
-iterations amplify that. So the exact-equality tests are marked
-`bit_identical` and run only on the reference build, and the numeric
-tolerances gain a floor off the reference architecture. The floor is the
-measured difference with an order of magnitude to spare, not a fudge: a real
-regression moves these numbers far further. `PACE_REFERENCE_BUILD=1` forces
-the strict behaviour anywhere.
-
-The mash tests hold the bindings to the same target as the R package: every
-neighbour slice of both canonical cohorts, compared gene by gene against mashr
-rather than by count, giving 1634 breast cancer and 426 melanoma calls.
-
-## Ranking the drivers of a pair
-
-`pace_drivers()` ranks, for each focal-neighbour pair, the genes mediating it:
-
-```python
-slopes = pace.pace_shrink(fit, null_correlation=False)
-stats = pace.fit_statistics(fit, counts)
-decomposition = pace.pace_decompose(fit, counts, stats=stats)
-drivers = pace.pace_drivers(fit, slopes, decomposition, stats)
+fit    = pace.fit_anndata(adata, "cell_type")
+slopes = pace.pace_shrink(fit)
+stats  = pace.fit_statistics(fit, counts)
+blocks = pace.pace_decompose(fit, counts, stats=stats)
+frame  = pace.single_frame_decomposition(fit, counts, blocks)
+drivers = pace.pace_drivers(fit, slopes, blocks, stats)
+pairs  = pace.pair_variance(fit, counts, frame)
 
 drivers["Macrophage", "Tumour"].to_dataframe().head()
 ```
 
-The score is `b^2 * spec^2 * focal_mean`, with `b` the shrunken slope. Squaring
-the slope makes it direction-blind, so a gene pushed down near the neighbour
-ranks alongside one pushed up; the specificity and level keep a gene that is
-barely expressed in the focal type off the top of the table on a noisy slope.
-The filter is lfsr < 0.05 alone -- there is no specificity cut at this layer,
-since `spec` is already in the score.
+On the breast cancer Xenium crop the R package ships, that last line gives:
 
-Against R this gives the same pairs, the same genes in the same rank order, and
-all fourteen columns to 2e-7. Each pair also carries its status and how many of
-its calls are expected to have the wrong sign.
-
-## Which neighbour matters to which focal type
-
-`pair_variance()` is the pair heatmap's table. Its definition is particular, so
-it is worth stating: the focal type's spatial share comes from the **observed**
-single frame, and that one number is split across its neighbours by a Pratt
-attribution renormalised over the off-diagonal pairs alone. A row therefore
-sums to the focal's observed spatial share, and the own-type pair is left out
-rather than shown as a large diagonal.
-
-```python
-pace.pair_variance(fit, counts)                       # baseline
-pace.pair_variance(fit, counts, block="responder")    # condition cohorts
+```
+ rank   gene  driver_score  b_clean   spec   lfsr
+    1   MRC1        0.0197  -0.1495 0.9358 0.0000
+    2  APOC1        0.0057   0.1302 0.8122 0.0000
+    3  CD163        0.0020  -0.0391 0.9474 0.0365
 ```
 
-## The whole pipeline
+MRC1 down and APOC1 up in macrophages near tumour: the tissue-resident marker
+falling and the lipid-associated one rising, which is the finding the method
+was built to recover. `examples/demo.py` runs the whole thing end to end.
+
+Fitting from plain arrays instead of an `AnnData`:
 
 ```python
-fit    = pace.fit_anndata(adata, "cell_type")
-slopes = pace.pace_shrink(fit, null_correlation=False)
-stats  = pace.fit_statistics(fit, counts)
-blocks = pace.pace_decompose(fit, counts, stats=stats)
-frame  = pace.single_frame_decomposition(fit, counts, blocks)
-drive  = pace.pace_drivers(fit, slopes, blocks, stats)
-pairs  = pace.pair_variance(fit, counts, frame)
+fit = pace.pace_fit(counts, x, y, cell_type)   # counts is cells by genes
 ```
+
+## What you get
+
+**`pace_fit` / `fit_anndata`** — the model. `fit_anndata` reads coordinates
+from `obsm["spatial"]`, labels from `obs`, gene names from `var_names` and
+counts from `X` or a `layer`, and never modifies the object.
+
+**`pace_shrink`** — multivariate adaptive shrinkage of the slopes, one mash fit
+per neighbour with the focal types as its conditions. Returns every slope with
+a local false sign rate; `slopes.calls()` summarises how many effects are
+called and how many of those should have the wrong sign.
+
+**`pace_decompose`** — each gene's fitted variance per focal type, split into
+cell-type identity, baseline spatial state, responder spatial state,
+contamination and dispersion. **`single_frame_decomposition`** gives the
+observed version, where the magnitudes come from the data and only the split
+within a cell type comes from the model; that is the table R's
+`varianceDecomposition()` returns.
+
+**`pace_drivers`** — per-pair tables ranking the genes that mediate a
+relationship by `b² · spec² · focal_mean`. Squaring the slope makes the score
+direction-blind, so a gene pushed down ranks alongside one pushed up;
+specificity and expression level keep a barely-expressed gene off the top on a
+noisy slope. Filtered on lfsr < 0.05 alone.
+
+**`pair_variance`** — how much of each focal type's variance each neighbour
+contributes. The focal's spatial share comes from the observed single frame and
+is split across neighbours by a Pratt attribution renormalised over the
+off-diagonal pairs, so a row sums to that share and the own-type pair is
+excluded.
+
+**`plot_*`** — the five figures, reproducing the R package's panels down to
+their conventions and hex colours.
 
 ## Figures
 
-Every panel returns matplotlib axes, so saving is ordinary matplotlib. For
-publication, write PDF with Type 42 fonts, which keeps the text selectable and
-editable and avoids the Type 3 fonts journals reject:
+![PACE figures](examples/pace_demo.png)
 
 ```python
-import matplotlib
-matplotlib.rcParams["pdf.fonttype"] = 42
-
-axis, zoom = pace.plot_decomposition(frame)
-axis.figure.savefig("decomposition.pdf", bbox_inches="tight")
-```
-
-```python
-pace.plot_decomposition(frame)                    # full bar + the rescaled zoom
+pace.plot_decomposition(frame)                 # full bar + the rescaled zoom
 pace.plot_pair_heatmap(pairs, fit.cell_types)
-pace.plot_drivers(drive, "Macrophage", "Tumour")
+pace.plot_drivers(drivers, "Macrophage", "Tumour", single_frame=frame)
 pace.plot_proximity(fit, counts, ["MRC1", "APOC1"], "Macrophage", "Tumour")
 pace.plot_shrinkage(slopes)
 ```
 
-Each reproduces the R package's panel, down to its conventions and its hex
-colours, which are not all obvious from the data:
+Every panel returns matplotlib axes, so saving is ordinary matplotlib. For
+publication use PDF with Type 42 fonts, which keeps text editable and avoids
+the Type 3 fonts journals reject:
 
-- The decomposition **leaves the residual block out**, so the bars stop near
-  40% rather than reaching 100, and orders the focal types by descending
-  spatial share rather than alphabetically.
-- The pair heatmap puts **focal on x and neighbour on y**, so a column sums to
-  one focal type's spatial share.
-- `plot_drivers` takes a `single_frame=` to add R's companion panel, which is
-  the check on the ranking: a top gene whose variance is nearly all cell-type
-  identity is driven by how much the focal expresses it, not by the neighbour.
-- `plot_proximity` bins by the **number of neighbouring cells** within a
-  radius, at R's literal breaks of 0, 2, 4, 6, 8 and up. The fitted kernel is
-  centred within image, so binning on it would give a negative axis.
+```python
+import matplotlib
+matplotlib.rcParams["pdf.fonttype"] = 42
+axis, zoom = pace.plot_decomposition(frame)
+axis.figure.savefig("decomposition.pdf", bbox_inches="tight")
+```
 
-On the packaged crop they reproduce the published figures cell for cell: MRC1
-down and APOC1 up in macrophages near tumour, B cells beside T cells as the
-strongest pair at 2.73%, and tumour reaching more focal types than any other
-neighbour.
+Four of the conventions are R's and are not obvious from the data: the
+decomposition leaves the **residual block out**, so bars stop near 40% rather
+than 100, and orders focal types by descending spatial share; the pair heatmap
+puts **focal on x**; `plot_drivers` takes `single_frame=` to add R's companion
+panel, which catches a top gene whose variance is really cell-type identity;
+and `plot_proximity` bins by the **number of neighbours** within a radius, at
+R's breaks of 0, 2, 4, 6, 8 and up, because the fitted kernel is centred within
+image and would give a negative axis.
+
+## How closely it matches R
+
+Bit-identity is a property of a build, not of the package. CI measures all
+three cases against the R package's own fits:
+
+| build | agreement |
+|---|---|
+| arm64 macOS, Apple clang (the reference) | **bit-identical** |
+| arm64 Linux, g++ | every tolerance test passes; exact equality lost |
+| x86-64 Linux, g++ | about 2.7e-4 |
+
+Eigen vectorises and reduces in a different order on x86-64, and thirteen IRLS
+iterations amplify it. One further difference is deliberate: R takes `trigamma`
+from its own maths library where the core computes its own. They agree to
+1.8e-15, which those iterations amplify to 8e-07 in the fitted effects; against
+an R build using the core's trigamma, nothing differs at all.
+
+The readouts are held to the same standard. Shrinkage calls the **same
+gene-focal pairs** as R, not merely the same number. Driver tables give the
+same genes in the same rank order, to 2e-7. The observed decomposition's
+sums of squares match to 1e-11, since they come from the counts rather than
+the fit.
+
+## Before comparing to an R fit row by row
+
+**Counts must be counts.** `adata.X` is whatever the last preprocessing step
+left there, and a negative binomial fit of log-normalised values converges and
+reports slopes that mean nothing. Non-integer values are refused; point `layer`
+at the raw counts.
+
+**Cell type order.** `types=None` sorts labels in Python's byte order; R sorts
+under `LC_COLLATE`, so a mixed-case label set orders differently. The fit is
+equivariant under a permutation, so the biology is unchanged but the row order
+is not. Pass `types=` to match a given R fit.
+
+**The condition's reference arm is not a relabelling.** Its first level is what
+every other arm is contrasted against, so it decides what the baseline slopes
+mean and which way the interaction points. R picks it by collation and Python
+would pick it by byte order; on labels as ordinary as `{"Responder",
+"non-responder"}` the fitted slopes then differ by 2. Leaving
+`condition_levels` unset warns for that reason. A numeric condition is refused,
+since R would model it continuously.
+
+**Neighbour scope.** `kernel_per_image=False`, as R's is: the search is global
+even across images, which is what fields of view from one section want. Set it
+`True` when the images are separate samples.
+
+**Shrinkage settings.** The core has mashr's canonical covariances but not the
+data-driven ones, so this is R at `data_driven = FALSE` — worth 11 of 1,637
+breast cancer calls. `null_correlation` defaults to `True` as R's does; the
+published counts used `False`. On a condition fit what is shrunk is
+`<resp_term>:<neighbour>`, so the result is the **responder layer, not the
+baseline effect**.
+
+**Large cohorts.** `ambient_mode="stream"` avoids materialising the
+cells-by-genes ambient product, which runs to several GB at a million cells. It
+is a memory knob only: the streamed fit is bit-identical to the cached one.
+
+## Tests
+
+```sh
+pip install -e ".[test]"
+python -m pytest tests
+```
+
+From a non-editable install, run them from outside the checkout
+(`cd /tmp && python -m pytest /path/to/pace-python/tests`): the repository root
+holds the source package `pace/`, which shadows the installed one but has no
+compiled `_core`, and the resulting ImportError blames a circular import rather
+than the real cause.
+
+The exact-equality tests are marked `bit_identical` and skip off the reference
+build; `PACE_REFERENCE_BUILD=1` forces them anywhere. The mash tests hold the
+bindings to every neighbour slice of both canonical cohorts, compared gene by
+gene against mashr: 1,634 breast cancer and 426 melanoma calls.
+
+## Building from source
+
+Two things are not free choices.
+
+**Eigen must be 3.4.** Against 3.5 the random effects move by about 3e-4 and
+the two languages no longer agree, so the build refuses anything else:
+
+```sh
+EIGEN_INCLUDE_DIR=$(Rscript -e 'cat(system.file("include", package="RcppEigen"))') \
+  pip install -e .
+```
+
+or fetch it directly with `bash tools/fetch_eigen.sh`. Set
+`PACE_ALLOW_ANY_EIGEN=1` to build anyway, accepting that the fits will not
+match. Installing a released wheel avoids the question entirely.
+
+**On macOS, use Apple's toolchain.** A conda or Homebrew `clang` brings an old
+`ld64` that links a shared object which loads nowhere — the build succeeds and
+the failure appears at import as `mis-aligned LINKEDIT string pool`:
+
+```sh
+CC=/usr/bin/clang CXX=/usr/bin/clang++ \
+  LDSHARED="/usr/bin/clang -bundle -undefined dynamic_lookup" pip install -e .
+```
+
+`ld -v` should report `PROJECT:ld-27037` or newer. The R package has the same
+requirement for the same reason.
+
+## The shared core
+
+The C++ core is owned by the [R package](https://github.com/ecool50/PACE) and
+vendored here under `src/core/`. Keeping the two in step is the one risk of
+separate repositories, so it is made visible rather than trusted:
+
+```sh
+python tools/sync_core.py ../PACE    # copy it in, record what came
+python -m pytest tests               # and prove it still reproduces R
+```
+
+`sync_core.py` writes a sha256 manifest with the upstream commit;
+`tests/test_core_sync.py` fails if a vendored file is edited here. The guard
+that matters is the rest of the suite, whose fixtures are R's own fits. Change
+the core in the R repository and sync — never edit `src/core/` here.
+
+## Licence
+
+GPL-3.0-or-later, as the R package is.
