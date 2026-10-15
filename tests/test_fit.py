@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -91,13 +92,14 @@ def test_the_fit_reproduces_r(fitted):
     g = fitted["U"].shape[1]
     for name, fixture in [("U", "irls_expect_U.txt"), ("B", "irls_expect_B.txt")]:
         np.testing.assert_allclose(fitted[name], vec(fixture).reshape(-1, g, order="F"),
-                                   rtol=0, atol=TRIGAMMA_TOL[name],
+                                   rtol=0, atol=tol(TRIGAMMA_TOL[name]),
                                    err_msg=f"{name} differs by more than the trigamma can explain")
     np.testing.assert_allclose(fitted["alpha"], vec("irls_expect_alpha.txt"),
-                               rtol=0, atol=TRIGAMMA_TOL["alpha"],
+                               rtol=0, atol=tol(TRIGAMMA_TOL["alpha"]),
                                err_msg="dispersions differ by more than the trigamma can explain")
 
 
+@pytest.mark.bit_identical
 def test_the_fit_is_bit_identical_when_the_trigamma_matches(fitted):
     """The same fit, from an R build using the core's trigamma, matches exactly.
 

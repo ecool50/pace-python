@@ -12,6 +12,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -74,7 +75,7 @@ def test_every_driver_column_matches_rs(pipeline):
     for name in COLUMNS:
         np.testing.assert_allclose(
             np.asarray(columns[name], dtype=float), vec(f"drv_{name}.txt"),
-            rtol=0, atol=1e-05, err_msg=f"{name} disagrees with R")
+            rtol=0, atol=tol(1e-05), err_msg=f"{name} disagrees with R")
 
 
 def test_the_pair_statuses_match_rs(pipeline):
@@ -92,7 +93,7 @@ def test_the_score_is_the_locked_definition(pipeline):
         if not len(table):
             continue
         expected = (table.b_clean ** 2) * (table.spec ** 2) * np.maximum(table.focal_mean, 0)
-        np.testing.assert_allclose(table.driver_score, expected, rtol=1e-09, atol=0)
+        np.testing.assert_allclose(table.driver_score, expected, rtol=1e-09, atol=tol(0))
 
 
 def test_the_ranking_is_by_descending_score(pipeline):

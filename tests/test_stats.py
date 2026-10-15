@@ -12,6 +12,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -43,13 +44,13 @@ def fit(counts):
 def test_the_rebuilt_biological_means_match_rs(fit, counts):
     mu_bio, _ = pace.fitted_means(fit, counts, [0, 1, 139])
     reference = vec("mu_bio_g3.txt").reshape(mu_bio.shape, order="F")
-    np.testing.assert_allclose(mu_bio, reference, rtol=1e-07, atol=0)
+    np.testing.assert_allclose(mu_bio, reference, rtol=1e-07, atol=tol(0))
 
 
 def test_the_rebuilt_contamination_means_match_rs(fit, counts):
     _, mu_spill = pace.fitted_means(fit, counts, [0, 1, 139])
     reference = vec("mu_spill_g3.txt").reshape(mu_spill.shape, order="F")
-    np.testing.assert_allclose(mu_spill, reference, rtol=1e-04, atol=1e-06)
+    np.testing.assert_allclose(mu_spill, reference, rtol=1e-04, atol=tol(1e-06))
 
 
 def test_the_statistics_match_rs(fit, counts):
@@ -60,10 +61,10 @@ def test_the_statistics_match_rs(fit, counts):
     assert stats.has_contamination
     np.testing.assert_allclose(
         stats.mu_mean, vec("stats_mu_mean.txt").reshape(int(dim[0]), int(dim[1]), order="F"),
-        rtol=1e-06, atol=1e-06)
+        rtol=1e-06, atol=tol(1e-06))
     np.testing.assert_allclose(
         stats.toff_var, vec("stats_toff_var.txt").reshape(int(dim[0]), int(dim[1]), order="F"),
-        rtol=1e-06, atol=1e-06)
+        rtol=1e-06, atol=tol(1e-06))
 
 
 def test_blocking_the_genes_does_not_change_the_answer(fit, counts):

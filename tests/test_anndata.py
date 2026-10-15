@@ -12,6 +12,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from _tolerance import tol
 
 anndata = pytest.importorskip("anndata")
 pd = pytest.importorskip("pandas")
@@ -61,6 +62,7 @@ def test_it_agrees_with_the_array_path_exactly(adata, arrays):
     assert from_adata.row_names == from_arrays.row_names
 
 
+@pytest.mark.bit_identical
 def test_it_is_still_bit_identical_to_r(adata):
     fit = pace.fit_anndata(adata, "cellType", n_threads=1)
     assert np.array_equal(fit.U, vec("irls_ab_U.txt").reshape(fit.U.shape, order="F"))
@@ -74,7 +76,7 @@ def test_the_gene_names_come_from_var_names(adata):
 def test_an_image_key_is_honoured(adata):
     fit = pace.fit_anndata(adata, "cellType", image_key="panel", n_threads=1)
     reference = vec("two_image_global_U.txt").reshape(fit.U.shape, order="F")
-    np.testing.assert_allclose(fit.U, reference, rtol=0, atol=1e-06)
+    np.testing.assert_allclose(fit.U, reference, rtol=0, atol=tol(1e-06))
 
 
 def test_a_dense_x_works_too(adata, arrays):
@@ -226,7 +228,7 @@ def test_a_condition_key_matches_r(adata):
     conditioned.obs["Arm"] = lines("cond2_label.txt")
     fit = pace.fit_anndata(conditioned, "cellType", condition_key="Arm", n_threads=1)
     np.testing.assert_allclose(
-        fit.U, vec("cond2_U.txt").reshape(fit.U.shape, order="F"), rtol=0, atol=1e-06)
+        fit.U, vec("cond2_U.txt").reshape(fit.U.shape, order="F"), rtol=0, atol=tol(1e-06))
     assert fit.row_names == lines("cond2_rownames.txt")
 
 

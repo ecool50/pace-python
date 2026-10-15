@@ -269,6 +269,25 @@ The repository root holds the source package `pace/`, which shadows the
 installed one but has no compiled `_core` in it, and the resulting ImportError
 blames a circular import rather than the real cause.
 
+### How exactly the fits match R, and where
+
+Bit-identity is a property of a build, not of the package, and CI measures all
+three cases:
+
+| build | against R's fixtures |
+|---|---|
+| arm64 macOS, Apple clang (the reference) | **bit-identical** |
+| arm64 Linux, g++ | every tolerance test passes; exact equality lost |
+| x86-64 Linux, g++ | agrees to about 2.7e-4 |
+
+Eigen vectorises and reduces in a different order on x86-64, and thirteen IRLS
+iterations amplify that. So the exact-equality tests are marked
+`bit_identical` and run only on the reference build, and the numeric
+tolerances gain a floor off the reference architecture. The floor is the
+measured difference with an order of magnitude to spare, not a fudge: a real
+regression moves these numbers far further. `PACE_REFERENCE_BUILD=1` forces
+the strict behaviour anywhere.
+
 The mash tests hold the bindings to the same target as the R package: every
 neighbour slice of both canonical cohorts, compared gene by gene against mashr
 rather than by count, giving 1634 breast cancer and 426 melanoma calls.

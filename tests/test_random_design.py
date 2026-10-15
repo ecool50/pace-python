@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -30,7 +31,7 @@ def test_design_block_matches_r():
     assert out["shape"] == (n, n_terms * n_groups)
     np.testing.assert_array_equal(out["indices"], col("rd_expect_i.txt").astype(np.int32))
     np.testing.assert_array_equal(out["indptr"], col("rd_expect_p.txt").astype(np.int32))
-    np.testing.assert_allclose(out["data"], col("rd_expect_x.txt"), rtol=1e-14, atol=0)
+    np.testing.assert_allclose(out["data"], col("rd_expect_x.txt"), rtol=1e-14, atol=tol(0))
 
 
 def test_the_grouping_matches_r():

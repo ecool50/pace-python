@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -31,9 +32,9 @@ def test_ambient_field_matches_r():
     # the sparsity pattern, not just the values
     np.testing.assert_array_equal(out["indices"], col("amb_expect_i.txt").astype(np.int32))
     np.testing.assert_array_equal(out["indptr"], col("amb_expect_p.txt").astype(np.int32))
-    np.testing.assert_allclose(out["data"], col("amb_expect_x.txt"), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(out["data"], col("amb_expect_x.txt"), rtol=1e-12, atol=tol(0))
     np.testing.assert_allclose(out["edge_fraction"], col("amb_expect_edge.txt"),
-                               rtol=1e-12, atol=0)
+                               rtol=1e-12, atol=tol(0))
 
 
 def test_the_field_has_the_properties_it_should():

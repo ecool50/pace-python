@@ -18,6 +18,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -70,7 +71,7 @@ def test_the_shrunken_estimates_match_rs(fit, tag, null_correlation):
                                       ("sd_shrunk", "sd_shrunk", 1e-05),
                                       ("lfsr", "lfsr", 1e-04)]:
         np.testing.assert_allclose(getattr(slopes, field)[order],
-                                   vec(f"{tag}_{fixture}.txt"), rtol=0, atol=tolerance,
+                                   vec(f"{tag}_{fixture}.txt"), rtol=0, atol=tol(tolerance),
                                    err_msg=f"{field} disagrees with R")
 
 

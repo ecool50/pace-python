@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -29,7 +30,7 @@ def test_kernels_match_r():
 
     for key, fixture in [("k_bio", "kern_expect_bio.txt"), ("k_tech", "kern_expect_tech.txt")]:
         expected = col(fixture).reshape(x.size, n_types)
-        np.testing.assert_allclose(out[key], expected, rtol=1e-12, atol=1e-12,
+        np.testing.assert_allclose(out[key], expected, rtol=1e-12, atol=tol(1e-12),
                                    err_msg=f"{key} disagrees with the R package")
 
 

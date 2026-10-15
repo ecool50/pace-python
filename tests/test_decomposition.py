@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 import pace
+from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -35,7 +36,7 @@ def test_driver_scores_match_r():
         ("R2_S", "ds_expect_R2_S.txt"),
         ("V_resid", "ds_expect_V_resid.txt"),
     ]:
-        np.testing.assert_allclose(out[key], col(fixture), rtol=1e-10, atol=0,
+        np.testing.assert_allclose(out[key], col(fixture), rtol=1e-10, atol=tol(0),
                                    err_msg=f"{key} disagrees with the R package")
 
 
@@ -51,7 +52,7 @@ def test_pratt_matches_r():
         ("diag_pct", "pratt_expect_within_focal_diag_pct.txt"),
         ("sign", "pratt_expect_sign.txt"),
     ]:
-        np.testing.assert_allclose(out[key], col(fixture), rtol=1e-10, atol=1e-300,
+        np.testing.assert_allclose(out[key], col(fixture), rtol=1e-10, atol=tol(1e-300),
                                    err_msg=f"{key} disagrees with the R package")
     # the scalars R reports alongside
     assert out["n_negative"] == int(np.loadtxt(FIX / "pratt_expect_n_negative_pairs.txt.gz"))
