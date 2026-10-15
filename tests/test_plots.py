@@ -12,6 +12,11 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from pace.decompose import pace_decompose as decomposition_table
+from pace.decompose import pair_variance as pair_variance_table
+from pace.decompose import single_frame_decomposition as single_frame_table
+from pace.drivers import pace_drivers as driver_tables
+from pace.shrink import pace_shrink as shrink_slopes
 
 matplotlib = pytest.importorskip("matplotlib")
 matplotlib.use("Agg")
@@ -35,15 +40,15 @@ def readouts():
     counts = csc_matrix(
         (vec("raw_y_x.txt"), vec("raw_y_i.txt", np.int32), vec("raw_y_p.txt", np.int32)),
         shape=(int(dim[0]), int(dim[1])))
-    fit = pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    fit = pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                         lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                         n_threads=1)
-    slopes = pace.pace_shrink(fit, null_correlation=False)
+    slopes = shrink_slopes(fit, null_correlation=False)
     stats = pace.fit_statistics(fit, counts)
-    blocks = pace.pace_decompose(fit, counts, stats=stats)
-    frame = pace.single_frame_decomposition(fit, counts, blocks)
-    drivers = pace.pace_drivers(fit, slopes, blocks, stats)
-    pairs = pace.pair_variance(fit, counts, frame)
+    blocks = decomposition_table(fit, counts, stats=stats)
+    frame = single_frame_table(fit, counts, blocks)
+    drivers = driver_tables(fit, slopes, blocks, stats)
+    pairs = pair_variance_table(fit, counts, frame)
     return counts, fit, slopes, blocks, frame, drivers, pairs
 
 

@@ -17,6 +17,11 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from pace.decompose import pace_decompose as decomposition_table
+from pace.decompose import pair_variance as pair_variance_table
+from pace.decompose import single_frame_decomposition as single_frame_table
+from pace.drivers import pace_drivers as driver_tables
+from pace.shrink import pace_shrink as shrink_slopes
 from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
@@ -53,7 +58,7 @@ def build(counts, condition):
     extra = {} if not condition else dict(
         condition=lines("cond2_label.txt"), condition_name="Arm",
         condition_levels=["PD", "PR"])
-    return pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    return pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                          lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                          n_threads=1, **extra)
 
@@ -63,7 +68,7 @@ def build(counts, condition):
 def case(request, counts):
     tag, condition = request.param
     fit = build(counts, condition)
-    return tag, pace.pace_decompose(fit, counts)
+    return tag, decomposition_table(fit, counts)
 
 
 def test_the_rows_are_the_same_as_rs(case):
@@ -123,14 +128,14 @@ def test_the_index_matrices_are_not_read_transposed(counts):
         u, se = fit.U[rows, :], fit.se_U[rows, :]
         by_hand[focal, :] = (np.einsum("kg,kl,lg->g", u, sigma, u)
                              + np.diag(sigma) @ (se ** 2))
-    decomposition = pace.pace_decompose(fit, counts)
+    decomposition = decomposition_table(fit, counts)
     np.testing.assert_allclose(decomposition.v_state_baseline, by_hand.ravel(),
                                rtol=0, atol=tol(1e-08))
 
 
 def test_a_condition_fit_carries_a_responder_block(counts):
-    with_condition = pace.pace_decompose(build(counts, True), counts)
-    without = pace.pace_decompose(build(counts, False), counts)
+    with_condition = decomposition_table(build(counts, True), counts)
+    without = decomposition_table(build(counts, False), counts)
     assert np.any(with_condition.v_state_responder > 0)
     assert np.all(without.v_state_responder == 0)
 
@@ -149,7 +154,7 @@ def test_a_fit_without_the_kernel_says_so(counts):
     import dataclasses
     stripped = dataclasses.replace(build(counts, False), kernel=None)
     with pytest.raises(ValueError, match="does not carry `kernel`"):
-        pace.pace_decompose(stripped, counts)
+        decomposition_table(stripped, counts)
 
 
 # --- the observed single frame -------------------------------------------
@@ -164,7 +169,7 @@ def test_a_fit_without_the_kernel_says_so(counts):
 def single_frame(request, counts):
     tag, condition = request.param
     fit = build(counts, condition)
-    return tag, pace.single_frame_decomposition(fit, counts)
+    return tag, single_frame_table(fit, counts)
 
 
 def test_the_single_frame_rows_are_the_same_as_rs(single_frame):
@@ -241,7 +246,7 @@ def test_it_can_become_dataframes_too(single_frame):
 # own-type pair is excluded rather than shown as a large diagonal.
 
 def _condition_fit(counts):
-    return pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    return pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                          lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                          condition=lines("cond2_label.txt"), condition_name="Arm",
                          condition_levels=["PD", "PR"], n_threads=1)
@@ -251,7 +256,7 @@ def _condition_fit(counts):
     ("pv", False, "spatial"), ("pvcs", True, "spatial"), ("pvcr", True, "responder")])
 def test_the_pair_table_matches_rs(counts, tag, condition, block):
     fit = _condition_fit(counts) if condition else build(counts, False)
-    table = pace.pair_variance(fit, counts, block=block)
+    table = pair_variance_table(fit, counts, block=block)
     position = {key: i for i, key in enumerate(zip(table["focal"], table["neighbour"]))}
     keys = list(zip(lines(f"{tag}_focal.txt"), lines(f"{tag}_neighbour.txt")))
     assert len(keys) == table["val"].size
@@ -263,8 +268,8 @@ def test_the_pair_table_matches_rs(counts, tag, condition, block):
 def test_each_focal_row_sums_to_its_observed_spatial_share(counts):
     """The definition, pinned: observed share split across neighbours."""
     fit = build(counts, False)
-    frame = pace.single_frame_decomposition(fit, counts)
-    table = pace.pair_variance(fit, counts, frame)
+    frame = single_frame_table(fit, counts)
+    table = pair_variance_table(fit, counts, frame)
     column = frame.block_names.index("Spatial %")
     for row, focal in enumerate(frame.focal_levels):
         rows = table["focal"] == focal
@@ -275,17 +280,17 @@ def test_each_focal_row_sums_to_its_observed_spatial_share(counts):
 
 def test_the_own_type_pair_is_excluded(counts):
     fit = build(counts, False)
-    table = pace.pair_variance(fit, counts)
+    table = pair_variance_table(fit, counts)
     assert not np.any(table["focal"] == table["neighbour"])
 
 
 def test_the_responder_block_needs_a_condition(counts):
     fit = build(counts, False)
     with pytest.raises(ValueError, match="no responder block"):
-        pace.pair_variance(fit, counts, block="responder")
+        pair_variance_table(fit, counts, block="responder")
 
 
 def test_an_unknown_block_is_refused(counts):
     fit = build(counts, False)
     with pytest.raises(ValueError, match='block must be'):
-        pace.pair_variance(fit, counts, block="spillover")
+        pair_variance_table(fit, counts, block="spillover")

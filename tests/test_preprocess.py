@@ -23,13 +23,13 @@ def kernel():
     cell_type = vec("kern_type.txt").astype(np.int32)
     n_types = int(vec("kern_ntypes.txt", int)[0])
     group = np.zeros(x.size, dtype=np.int32)
-    out = pace.neighbour_kernels(x, y, cell_type, n_types, group, eps=90.0)
+    out = pace._core.neighbour_kernels(x, y, cell_type, n_types, group, eps=90.0)
     return out["k_bio"], cell_type, group, n_types
 
 
 def test_dropping_sparse_pairs_matches_r():
     k_bio, cell_type, _, n_types = kernel()
-    out = pace.drop_sparse_kernel(k_bio, cell_type, 30.0)
+    out = pace._core.drop_sparse_kernel(k_bio, cell_type, 30.0)
     expected = vec("pre_drop.txt").reshape(k_bio.shape, order="F")
     np.testing.assert_allclose(out["kernel"], expected, rtol=1e-14, atol=tol(0))
     assert out["n_dropped"] == int(vec("pre_drop_n.txt", int)[0])
@@ -39,8 +39,8 @@ def test_dropping_sparse_pairs_matches_r():
 
 def test_centring_within_groups_matches_r():
     k_bio, cell_type, group, n_types = kernel()
-    dropped = pace.drop_sparse_kernel(k_bio, cell_type, 30.0)["kernel"]
-    out = pace.centre_within_groups(dropped, group, cell_type, 1, n_types)
+    dropped = pace._core.drop_sparse_kernel(k_bio, cell_type, 30.0)["kernel"]
+    out = pace._core.centre_within_groups(dropped, group, cell_type, 1, n_types)
     np.testing.assert_allclose(out, vec("pre_centre.txt").reshape(out.shape, order="F"),
                                rtol=1e-12, atol=tol(1e-12))
     # centring leaves each (image, type) group with mean zero
@@ -52,7 +52,7 @@ def test_centring_within_groups_matches_r():
 
 def test_standardise_matches_r():
     k_bio = kernel()[0]
-    out = pace.standardise(np.asfortranarray(k_bio[:, 0].copy()))
+    out = pace._core.standardise(np.asfortranarray(k_bio[:, 0].copy()))
     np.testing.assert_allclose(out["values"], vec("pre_std.txt"), rtol=1e-12, atol=tol(1e-12))
     np.testing.assert_allclose(out["sd"], vec("pre_std_sd.txt")[0], rtol=1e-12)
 
@@ -60,7 +60,7 @@ def test_standardise_matches_r():
 def test_anchor_mask_matches_r():
     dim = vec("pre_det_dim.txt", int)
     det = np.asfortranarray(vec("pre_det.txt").reshape(dim[0], dim[1], order="F"))
-    out = pace.anchor_mask(det, 0.2, 0.1)
+    out = pace._core.anchor_mask(det, 0.2, 0.1)
     np.testing.assert_allclose(out["mask"], vec("pre_anchor.txt").reshape(det.shape, order="F"),
                                rtol=0, atol=tol(0))
     np.testing.assert_array_equal(out["n_anchor"], vec("pre_anchor_n.txt", np.int32))
@@ -74,7 +74,7 @@ def test_data_informed_weights_match_r():
     det = np.asfortranarray(vec("pre_det.txt").reshape(dim[0], dim[1], order="F"))
     focal_of_row = np.ascontiguousarray(vec("pre_focalrow.txt", np.int32))
     scale_of_row = np.asfortranarray(vec("pre_scalerow.txt"))
-    out = pace.data_informed_weights(det, focal_of_row, scale_of_row)
+    out = pace._core.data_informed_weights(det, focal_of_row, scale_of_row)
     ddim = vec("pre_diw_dim.txt", int)
     np.testing.assert_allclose(out, vec("pre_diw.txt").reshape(ddim[0], ddim[1], order="F"),
                                rtol=1e-14, atol=tol(0))

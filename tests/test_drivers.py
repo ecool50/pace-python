@@ -12,6 +12,11 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from pace.decompose import pace_decompose as decomposition_table
+from pace.decompose import pair_variance as pair_variance_table
+from pace.decompose import single_frame_decomposition as single_frame_table
+from pace.drivers import pace_drivers as driver_tables
+from pace.shrink import pace_shrink as shrink_slopes
 from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
@@ -38,13 +43,13 @@ def pipeline():
     counts = csc_matrix(
         (vec("raw_y_x.txt"), vec("raw_y_i.txt", np.int32), vec("raw_y_p.txt", np.int32)),
         shape=(int(dim[0]), int(dim[1])))
-    fit = pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    fit = pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                         lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                         n_threads=1)
-    slopes = pace.pace_shrink(fit, null_correlation=False)
+    slopes = shrink_slopes(fit, null_correlation=False)
     stats = pace.fit_statistics(fit, counts)
-    decomposition = pace.pace_decompose(fit, counts, stats=stats)
-    drivers = pace.pace_drivers(fit, slopes, decomposition, stats)
+    decomposition = decomposition_table(fit, counts, stats=stats)
+    drivers = driver_tables(fit, slopes, decomposition, stats)
     return counts, fit, slopes, stats, decomposition, drivers
 
 
@@ -119,7 +124,7 @@ def test_a_pair_is_never_its_own_neighbour(pipeline):
 
 def test_a_requested_subset_of_pairs_is_honoured(pipeline):
     counts, fit, slopes, stats, decomposition, _ = pipeline
-    one = pace.pace_drivers(fit, slopes, decomposition, stats,
+    one = driver_tables(fit, slopes, decomposition, stats,
                             pairs=[("Macrophage", "Tumour")])
     assert list(one.pairs) == ["Macrophage_Tumour"]
     assert one["Macrophage", "Tumour"] is one.pairs["Macrophage_Tumour"]

@@ -36,7 +36,7 @@ def counts():
 
 @pytest.fixture(scope="module")
 def fit(counts):
-    return pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    return pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                          lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                          n_threads=1)
 

@@ -25,7 +25,7 @@ def test_kernels_match_r():
     n_types = int(col("kern_ntypes.txt"))
     group = np.zeros(x.size, dtype=np.int32)
 
-    out = pace.neighbour_kernels(x, y, cell_type, n_types, group,
+    out = pace._core.neighbour_kernels(x, y, cell_type, n_types, group,
                                  per_group=False, h_bio=30.0, h_tech=5.0, eps=90.0)
 
     for key, fixture in [("k_bio", "kern_expect_bio.txt"), ("k_tech", "kern_expect_tech.txt")]:
@@ -40,7 +40,7 @@ def test_kernels_have_the_shape_and_sign_they_should():
     cell_type = col("kern_type.txt").astype(np.int32)
     n_types = int(col("kern_ntypes.txt"))
     group = np.zeros(x.size, dtype=np.int32)
-    out = pace.neighbour_kernels(x, y, cell_type, n_types, group)
+    out = pace._core.neighbour_kernels(x, y, cell_type, n_types, group)
 
     assert out["k_bio"].shape == (x.size, n_types)
     assert out["k_tech"].shape == (x.size, n_types)

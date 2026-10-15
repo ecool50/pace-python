@@ -23,7 +23,7 @@ def build():
     y = np.ascontiguousarray(col("kern_y.txt"))
     cell_type = col("kern_type.txt").astype(np.int32)
     image = np.zeros(x.size, dtype=np.int32)
-    return pace.ambient_field(x, y, cell_type, image, n_images=1, h_tech=5.0,
+    return pace._core.ambient_field(x, y, cell_type, image, n_images=1, h_tech=5.0,
                               edge_correct=True)
 
 
@@ -59,6 +59,6 @@ def test_turning_off_the_edge_correction_sets_every_fraction_to_one():
     y = np.ascontiguousarray(col("kern_y.txt"))
     cell_type = col("kern_type.txt").astype(np.int32)
     image = np.zeros(x.size, dtype=np.int32)
-    out = pace.ambient_field(x, y, cell_type, image, n_images=1, h_tech=5.0,
+    out = pace._core.ambient_field(x, y, cell_type, image, n_images=1, h_tech=5.0,
                              edge_correct=False)
     np.testing.assert_allclose(out["edge_fraction"], 1.0)

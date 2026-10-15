@@ -1,4 +1,4 @@
-"""`pace_fit()` end to end, against the fit R produces from the same raw data.
+"""`pace_model()` end to end, against the fit R produces from the same raw data.
 
 test_fit.py checks the solver when it is handed R's own captured inputs. This
 checks the layer above: starting from nothing but counts, coordinates and cell
@@ -19,7 +19,7 @@ from scipy.sparse import csc_matrix
 
 import pace
 from _tolerance import tol
-from pace.fit import pace_fit
+from pace.fit import pace_model
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -44,7 +44,7 @@ def _raw_inputs():
 @pytest.fixture(scope="module")
 def fit():
     counts, x, y, cell_type = _raw_inputs()
-    return pace_fit(counts, x, y, cell_type, n_threads=1)
+    return pace_model(counts, x, y, cell_type, n_threads=1)
 
 
 @pytest.mark.bit_identical
@@ -94,7 +94,7 @@ def test_the_contamination_loadings_match_rs(fit):
 def test_a_one_level_condition_is_refused(fit):
     counts, x, y, cell_type = _raw_inputs()
     with pytest.raises(ValueError, match="at least two"):
-        pace_fit(counts, x, y, cell_type, condition=["PD"] * x.size)
+        pace_model(counts, x, y, cell_type, condition=["PD"] * x.size)
 
 
 # --- several images -------------------------------------------------------
@@ -116,7 +116,7 @@ def two_image_inputs():
 @pytest.mark.parametrize("kernel_per_image,tag", [(False, "global"), (True, "perimage")])
 def test_both_neighbour_scopes_match_r_on_two_images(two_image_inputs, kernel_per_image, tag):
     counts, x, y, cell_type, image = two_image_inputs
-    fit = pace_fit(counts, x, y, cell_type, image=image,
+    fit = pace_model(counts, x, y, cell_type, image=image,
                    kernel_per_image=kernel_per_image, n_threads=1)
     reference = vec(f"two_image_{tag}_U.txt").reshape(fit.U.shape, order="F")
     np.testing.assert_allclose(fit.U, reference, rtol=0, atol=tol(1e-06))
@@ -126,7 +126,7 @@ def test_both_neighbour_scopes_match_r_on_two_images(two_image_inputs, kernel_pe
 def test_the_default_neighbour_scope_is_global_like_rs(two_image_inputs):
     """R's `kernel_per_image` defaults to FALSE even with several images."""
     counts, x, y, cell_type, image = two_image_inputs
-    fit = pace_fit(counts, x, y, cell_type, image=image, n_threads=1)
+    fit = pace_model(counts, x, y, cell_type, image=image, n_threads=1)
     reference = vec("two_image_global_U.txt").reshape(fit.U.shape, order="F")
     np.testing.assert_allclose(fit.U, reference, rtol=0, atol=tol(1e-06))
     assert fit.params["kernel_per_image"] is False
@@ -140,14 +140,14 @@ def test_a_missing_cell_type_is_refused_not_turned_into_a_type(two_image_inputs)
     labels = list(cell_type)
     labels[7] = np.nan
     with pytest.raises(ValueError, match="every cell needs a cell type"):
-        pace_fit(counts, x, y, labels)
+        pace_model(counts, x, y, labels)
 
 
 def test_an_explicit_type_order_is_honoured(two_image_inputs):
     """R's `types` argument, which is how a locked row order is reproduced."""
     counts, x, y, cell_type, _ = two_image_inputs
     reversed_types = sorted(set(cell_type))[::-1]
-    fit = pace_fit(counts, x, y, cell_type, types=reversed_types, n_threads=1)
+    fit = pace_model(counts, x, y, cell_type, types=reversed_types, n_threads=1)
     assert fit.cell_types == reversed_types
     assert fit.row_names[0] == f"{reversed_types[0]}::(Intercept)"
 
@@ -155,7 +155,7 @@ def test_an_explicit_type_order_is_honoured(two_image_inputs):
 def test_an_unknown_label_is_refused(two_image_inputs):
     counts, x, y, cell_type, _ = two_image_inputs
     with pytest.raises(ValueError, match="not in `types`"):
-        pace_fit(counts, x, y, cell_type, types=sorted(set(cell_type))[1:])
+        pace_model(counts, x, y, cell_type, types=sorted(set(cell_type))[1:])
 
 
 # --- sparse matrices that are not in canonical form ----------------------
@@ -199,7 +199,7 @@ def test_a_non_canonical_matrix_gives_the_same_fit(fit, damage):
     broken = damage(counts)
     assert not broken.has_canonical_format
     assert np.array_equal(np.asarray(broken.todense()), np.asarray(counts.todense()))
-    refit = pace_fit(broken, x, y, cell_type, n_threads=1)
+    refit = pace_model(broken, x, y, cell_type, n_threads=1)
     assert np.array_equal(refit.U, fit.U)
     assert np.array_equal(refit.alpha, fit.alpha)
 
@@ -208,7 +208,7 @@ def test_normalising_does_not_touch_the_callers_matrix(fit):
     counts, x, y, cell_type = _raw_inputs()
     broken = _split_stored_entries(counts)
     before = broken.nnz, broken.data.copy()
-    pace_fit(broken, x, y, cell_type, n_threads=1)
+    pace_model(broken, x, y, cell_type, n_threads=1)
     assert broken.nnz == before[0]
     assert np.array_equal(broken.data, before[1])
 
@@ -222,7 +222,7 @@ def test_normalising_does_not_touch_the_callers_matrix(fit):
 @pytest.mark.parametrize("tag,name,n_terms", [("cond2", "Arm", 18), ("cond3", "Arm3", 27)])
 def test_a_condition_fit_matches_r(tag, name, n_terms):
     counts, x, y, cell_type = _raw_inputs()
-    fit = pace_fit(counts, x, y, cell_type, condition=lines(f"{tag}_label.txt"),
+    fit = pace_model(counts, x, y, cell_type, condition=lines(f"{tag}_label.txt"),
                    condition_name=name, n_threads=1)
     dim = vec(f"{tag}_U_dim.txt", int)
     assert fit.U.shape == (int(dim[0]), int(dim[1]))
@@ -238,7 +238,7 @@ def test_a_condition_fit_matches_r(tag, name, n_terms):
 def test_the_condition_rows_are_named_the_way_r_names_them(tag, name):
     """The interaction order is R's, level innermost, not the obvious one."""
     counts, x, y, cell_type = _raw_inputs()
-    fit = pace_fit(counts, x, y, cell_type, condition=lines(f"{tag}_label.txt"),
+    fit = pace_model(counts, x, y, cell_type, condition=lines(f"{tag}_label.txt"),
                    condition_name=name, n_threads=1)
     assert fit.row_names == lines(f"{tag}_rownames.txt")
     assert fit.params["fixed_names"] == lines(f"{tag}_fixednames.txt")
@@ -246,7 +246,7 @@ def test_the_condition_rows_are_named_the_way_r_names_them(tag, name):
 
 def test_the_condition_terms_take_their_prefix_from_the_name():
     counts, x, y, cell_type = _raw_inputs()
-    fit = pace_fit(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
+    fit = pace_model(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
                    condition_name="Responder", n_threads=1)
     assert "Responder::PR" not in fit.row_names
     assert fit.params["fixed_names"] == ["(Intercept)", "ResponderPR"]
@@ -255,7 +255,7 @@ def test_the_condition_terms_take_their_prefix_from_the_name():
 
 def test_the_reference_level_is_the_first_and_is_dropped():
     counts, x, y, cell_type = _raw_inputs()
-    flipped = pace_fit(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
+    flipped = pace_model(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
                        condition_name="Arm", condition_levels=["PR", "PD"], n_threads=1)
     assert flipped.params["fixed_names"] == ["(Intercept)", "ArmPD"]
     # the same model, reparameterised: the intercept absorbs the other arm, so
@@ -268,13 +268,13 @@ def test_a_missing_condition_is_refused():
     labels = list(lines("cond2_label.txt"))
     labels[3] = np.nan
     with pytest.raises(ValueError, match="every cell needs a condition"):
-        pace_fit(counts, x, y, cell_type, condition=labels, condition_name="Arm")
+        pace_model(counts, x, y, cell_type, condition=labels, condition_name="Arm")
 
 
 def test_an_unknown_condition_label_is_refused():
     counts, x, y, cell_type = _raw_inputs()
     with pytest.raises(ValueError, match="not a level"):
-        pace_fit(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
+        pace_model(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
                  condition_name="Arm", condition_levels=["PD"])
 
 
@@ -290,7 +290,7 @@ def test_a_cell_type_with_no_cells_does_not_poison_the_fit():
     matched to R or shared across cohorts, so a type absent here is normal.
     """
     counts, x, y, cell_type = _raw_inputs()
-    fit = pace_fit(counts, x, y, cell_type, types=sorted(set(cell_type)) + ["Ghost"],
+    fit = pace_model(counts, x, y, cell_type, types=sorted(set(cell_type)) + ["Ghost"],
                    n_threads=1)
     assert np.all(np.isfinite(fit.U))
     assert np.all(np.isfinite(fit.B))
@@ -302,7 +302,7 @@ def test_a_cell_type_with_no_cells_does_not_poison_the_fit():
 def test_an_empty_cell_type_barely_moves_the_real_rows(fit):
     """It adds all-zero rows, which shift the pooled variance components a little."""
     counts, x, y, cell_type = _raw_inputs()
-    padded = pace_fit(counts, x, y, cell_type, types=sorted(set(cell_type)) + ["Ghost"],
+    padded = pace_model(counts, x, y, cell_type, types=sorted(set(cell_type)) + ["Ghost"],
                       n_threads=1)
     index = {name: i for i, name in enumerate(padded.row_names)}
     rows = [index[name] for name in fit.row_names]
@@ -313,7 +313,7 @@ def test_a_condition_level_no_cell_carries_is_refused():
     """It would add an all-zero column and make every coefficient NaN."""
     counts, x, y, cell_type = _raw_inputs()
     with pytest.raises(ValueError, match="no cell carries the condition level"):
-        pace_fit(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
+        pace_model(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
                  condition_name="Arm", condition_levels=["PD", "PR", "SD"])
 
 
@@ -321,7 +321,7 @@ def test_a_numeric_condition_is_refused_rather_than_factored():
     """R would model it continuously; applying contrasts instead is a different fit."""
     counts, x, y, cell_type = _raw_inputs()
     with pytest.raises(ValueError, match="numeric or boolean condition"):
-        pace_fit(counts, x, y, cell_type, condition=np.ones(x.size, dtype=int),
+        pace_model(counts, x, y, cell_type, condition=np.ones(x.size, dtype=int),
                  condition_name="Arm")
 
 
@@ -329,7 +329,7 @@ def test_inferring_the_reference_arm_warns():
     """The reference arm changes the fit, and byte order is not R's rule."""
     counts, x, y, cell_type = _raw_inputs()
     with pytest.warns(UserWarning, match="reference arm"):
-        pace_fit(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
+        pace_model(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
                  condition_name="Arm", n_threads=1)
 
 
@@ -338,7 +338,7 @@ def test_naming_the_levels_does_not_warn():
     import warnings as _warnings
     with _warnings.catch_warnings():
         _warnings.simplefilter("error")
-        pace_fit(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
+        pace_model(counts, x, y, cell_type, condition=lines("cond2_label.txt"),
                  condition_name="Arm", condition_levels=["PD", "PR"], n_threads=1)
 
 
@@ -347,10 +347,10 @@ def test_the_reference_arm_changes_the_fit_not_just_its_labels():
     counts, x, y, cell_type = _raw_inputs()
     labels = ["Responder" if v == "PR" else "non-responder"
               for v in lines("cond2_label.txt")]
-    byte_order = pace_fit(counts, x, y, cell_type, condition=labels,
+    byte_order = pace_model(counts, x, y, cell_type, condition=labels,
                           condition_name="Resp",
                           condition_levels=["Responder", "non-responder"], n_threads=1)
-    collated = pace_fit(counts, x, y, cell_type, condition=labels,
+    collated = pace_model(counts, x, y, cell_type, condition=labels,
                         condition_name="Resp",
                         condition_levels=["non-responder", "Responder"], n_threads=1)
     assert np.abs(byte_order.U - collated.U).max() > 1.0
@@ -369,7 +369,7 @@ def test_the_cores_warnings_reach_the_caller(monkeypatch):
     monkeypatch.setattr(module._core, "fit_irls", noisy)
     counts, x, y, cell_type = _raw_inputs()
     with pytest.warns(UserWarning, match="non-finite genes"):
-        pace_fit(counts, x, y, cell_type, n_threads=1)
+        pace_model(counts, x, y, cell_type, n_threads=1)
 
 
 def test_a_diverged_fit_raises_instead_of_returning_nan(monkeypatch):
@@ -390,13 +390,13 @@ def test_a_diverged_fit_raises_instead_of_returning_nan(monkeypatch):
     monkeypatch.setattr(module._core, "fit_irls", diverged)
     counts, x, y, cell_type = _raw_inputs()
     with pytest.raises(FloatingPointError, match="finite coefficients"):
-        pace_fit(counts, x, y, cell_type, n_threads=1)
+        pace_model(counts, x, y, cell_type, n_threads=1)
 
 
 def test_rows_with_no_data_behind_them_are_counted(fit):
     counts, x, y, cell_type = _raw_inputs()
     assert fit.params["n_structurally_zero"] == 0
-    padded = pace_fit(counts, x, y, cell_type, types=sorted(set(cell_type)) + ["Ghost"],
+    padded = pace_model(counts, x, y, cell_type, types=sorted(set(cell_type)) + ["Ghost"],
                       n_threads=1)
     assert padded.params["n_structurally_zero"] == 10
 
@@ -410,7 +410,7 @@ def test_streaming_the_ambient_field_changes_no_number(fit):
     per chunk, so the two differ only in chunking, which is exact.
     """
     counts, x, y, cell_type = _raw_inputs()
-    streamed = pace_fit(counts, x, y, cell_type, ambient_mode="stream", n_threads=1)
+    streamed = pace_model(counts, x, y, cell_type, ambient_mode="stream", n_threads=1)
     assert np.array_equal(streamed.U, fit.U)
     assert np.array_equal(streamed.alpha, fit.alpha)
     assert np.array_equal(streamed.rho, fit.rho)
@@ -420,14 +420,14 @@ def test_a_streamed_condition_fit_also_agrees():
     counts, x, y, cell_type = _raw_inputs()
     shared = dict(condition=lines("cond2_label.txt"), condition_name="Arm",
                   condition_levels=["PD", "PR"], n_threads=1)
-    assert np.array_equal(pace_fit(counts, x, y, cell_type, ambient_mode="stream", **shared).U,
-                          pace_fit(counts, x, y, cell_type, ambient_mode="cache", **shared).U)
+    assert np.array_equal(pace_model(counts, x, y, cell_type, ambient_mode="stream", **shared).U,
+                          pace_model(counts, x, y, cell_type, ambient_mode="cache", **shared).U)
 
 
 def test_the_readouts_work_off_a_streamed_fit():
     """Streaming must not cost the fit the pieces the readouts rebuild from."""
     counts, x, y, cell_type = _raw_inputs()
-    streamed = pace_fit(counts, x, y, cell_type, genes=lines("raw_genes.txt"),
+    streamed = pace_model(counts, x, y, cell_type, genes=lines("raw_genes.txt"),
                         ambient_mode="stream", n_threads=1)
     stats = pace.fit_statistics(streamed, counts)
     np.testing.assert_allclose(
@@ -439,4 +439,4 @@ def test_the_readouts_work_off_a_streamed_fit():
 def test_an_unknown_ambient_mode_is_refused():
     counts, x, y, cell_type = _raw_inputs()
     with pytest.raises(ValueError, match="ambient_mode"):
-        pace_fit(counts, x, y, cell_type, ambient_mode="lazy")
+        pace_model(counts, x, y, cell_type, ambient_mode="lazy")

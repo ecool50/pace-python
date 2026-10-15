@@ -55,6 +55,18 @@ class PaceFit:
     kernel: np.ndarray | None = None              # n x types, the Gaussian kernel
     x: np.ndarray | None = None                   # cell coordinates, for the plots
     y: np.ndarray | None = None
+    # The reporting layers, as the R object carries them: empty after
+    # pace_model(), filled by pace_shrink(), pace_decompose() and
+    # pace_drivers(), or by pace_fit() which runs all four.
+    neighbour_slopes: Any = None
+    variance_decomposition: Any = None
+    single_frame: Any = None
+    top_drivers: Any = None
+    contam_fraction: np.ndarray | None = None
+    # kept so the later stages need not be handed the counts again, the way
+    # R hands paceDecompose() the SpatialExperiment a second time
+    _counts: Any = None
+    _statistics: Any = None
     condition_code: np.ndarray | None = None      # each cell's level, or None
 
     def __repr__(self) -> str:
@@ -186,13 +198,49 @@ def _anchors(x, y, counts_csc, type_code, image_code, n_types, n_cells,
     return out["mask"], int(core.sum())
 
 
-def pace_fit(counts, x, y, cell_type, image=None, *, genes=None, types=None,
+def _from_anndata(adata, celltype_key, image_key, condition_key, genes,
+                  kwargs_spatial_key="spatial", kwargs_layer=None):
+    """Pull the arrays out of an AnnData, as R's methods pull them from an SPE."""
+    for attribute in ("X", "obs", "obsm", "var_names"):
+        if not hasattr(adata, attribute):
+            raise TypeError(f"this does not look like an AnnData: no `{attribute}`")
+    if celltype_key is None:
+        raise ValueError(
+            "pass the obs column holding the cell types, e.g. "
+            'pace_fit(adata, cell_type="cell_type")')
+    # The cheap lookups first: a missing obsm key should not be reported only
+    # after the whole count matrix has been converted.
+    x, y = _anndata_coordinates(adata, kwargs_spatial_key)
+    cell_type = _anndata_column(adata, celltype_key, "cell types")
+    image = _anndata_column(adata, image_key, "images") if image_key is not None else None
+    condition = levels = None
+    if condition_key is not None:
+        condition = _anndata_column(adata, condition_key, "condition")
+        # the terms take their prefix from the column name, and a Categorical's
+        # order is its level order, exactly as a factor's is
+        levels = _categorical_levels(adata.obs[condition_key])
+    if genes is None:
+        genes = [str(name) for name in adata.var_names]
+        if len(set(genes)) != len(genes):
+            raise ValueError("var_names must be unique; "
+                             "adata.var_names_make_unique() fixes it")
+    counts = _anndata_counts(adata, kwargs_layer)
+    return counts, x, y, cell_type, image, genes, condition, levels
+
+
+def pace_model(counts, x=None, y=None, cell_type=None, image=None, *, genes=None, types=None,
              h_bio=30.0, h_tech=5.0, eps=None, condition=None,
              condition_name="condition", condition_levels=None, min_effective=30.0,
              within_image=True, kernel_per_image=False, homotypic_fraction=0.5,
              ambient_mode="cache", n_iter=32, min_iter=12, chunk_size=128,
-             n_threads=1, verbose=False):
-    """Fit PACE to a cells-by-genes count matrix.
+             n_threads=1, verbose=False, spatial_key="spatial", layer=None):
+    """Fit the PACE model, without the reporting layers.
+
+    The equivalent of `paceModel()`. Takes either a cells-by-genes count
+    matrix with coordinates and labels, or an `AnnData`, in which case the
+    coordinates come from `obsm[spatial_key]` and the labels from
+    `obs[cell_type]`. `pace_fit()` runs this and the three reporting stages.
+
 
     Parameters
     ----------
@@ -224,6 +272,10 @@ def pace_fit(counts, x, y, cell_type, image=None, *, genes=None, types=None,
         view of one section wants the global search. Set it True when the
         images are separate samples. The contamination field is always
         per-image regardless, as it is in R.
+    spatial_key, layer
+        Only used when the first argument is an `AnnData`: which `obsm` key
+        holds the coordinates, and which layer holds the counts (`None` for
+        `X`).
     ambient_mode
         `"cache"` (default) materialises the whole cells-by-genes ambient
         product, as R's default does. `"stream"` keeps only the weight matrix
@@ -233,7 +285,9 @@ def pace_fit(counts, x, y, cell_type, image=None, *, genes=None, types=None,
         either way, since cache mode forms its product with the same routine
         and the two differ only in chunking.
     condition
-        One label per cell, or None. Given one, the model gains a condition
+        One label per cell, or -- when the first argument is an `AnnData` --
+        the name of the `obs` column holding them, whose name then becomes the
+        prefix of the condition's terms. Given one, the model gains a condition
         main effect in the fixed design and a condition-by-neighbour
         interaction in the random-effect block, which is the responder layer:
         `~ 1 + condition * (types)`, as in R.
@@ -261,9 +315,15 @@ def pace_fit(counts, x, y, cell_type, image=None, *, genes=None, types=None,
     PaceFit
     """
     if hasattr(counts, "obsm"):
-        raise TypeError(
-            "pace_fit() takes a count matrix, not an AnnData; use "
-            "fit_anndata(adata, celltype_key) instead.")
+        condition_key = condition
+        counts, x, y, cell_type, image, genes, condition, inferred = _from_anndata(
+            counts, cell_type, image, condition_key, genes,
+            kwargs_spatial_key=spatial_key, kwargs_layer=layer)
+        if condition is not None:
+            if condition_name == "condition":
+                condition_name = str(condition_key)
+            if condition_levels is None and inferred is not None:
+                condition_levels = inferred
 
     x = np.asfortranarray(np.asarray(x, dtype=np.float64).ravel())
     y = np.asfortranarray(np.asarray(y, dtype=np.float64).ravel())
@@ -570,7 +630,7 @@ def pace_fit(counts, x, y, cell_type, image=None, *, genes=None, types=None,
         design={"indptr": design["indptr"], "indices": design["indices"],
                 "data": design["data"], "shape": design["shape"]},
         ambient_weights=weights_matrix, fixed=fixed, offset=offset, type_code=type_code,
-        kernel=k_bio, x=x, y=y,
+        kernel=k_bio, x=x, y=y, _counts=counts,
         condition_code=None if condition_labels is None else np.ascontiguousarray(
             [condition_levels.index(v) for v in condition_labels], dtype=np.int32),
         params=dict(h_bio=h_bio, h_tech=h_tech, eps=eps, min_effective=min_effective,

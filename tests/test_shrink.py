@@ -18,6 +18,11 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
+from pace.decompose import pace_decompose as decomposition_table
+from pace.decompose import pair_variance as pair_variance_table
+from pace.decompose import single_frame_decomposition as single_frame_table
+from pace.drivers import pace_drivers as driver_tables
+from pace.shrink import pace_shrink as shrink_slopes
 from _tolerance import tol
 
 FIX = Path(__file__).parent / "fixtures"
@@ -38,7 +43,7 @@ def fit():
     counts = csc_matrix(
         (vec("raw_y_x.txt"), vec("raw_y_i.txt", np.int32), vec("raw_y_p.txt", np.int32)),
         shape=(int(dim[0]), int(dim[1])))
-    return pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    return pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                          lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                          n_threads=1)
 
@@ -56,14 +61,14 @@ def aligned(slopes, tag):
 @pytest.mark.parametrize("tag,null_correlation", [("shrinkI", False), ("shrinkV", True)])
 def test_the_called_set_is_the_same_as_rs(fit, tag, null_correlation):
     """The load-bearing assertion: the same gene-focal pairs, not just as many."""
-    slopes = pace.pace_shrink(fit, null_correlation=null_correlation)
+    slopes = shrink_slopes(fit, null_correlation=null_correlation)
     order = aligned(slopes, tag)
     assert np.array_equal(slopes.lfsr[order] < 0.05, vec(f"{tag}_lfsr.txt") < 0.05)
 
 
 @pytest.mark.parametrize("tag,null_correlation", [("shrinkI", False), ("shrinkV", True)])
 def test_the_shrunken_estimates_match_rs(fit, tag, null_correlation):
-    slopes = pace.pace_shrink(fit, null_correlation=null_correlation)
+    slopes = shrink_slopes(fit, null_correlation=null_correlation)
     order = aligned(slopes, tag)
     for field, fixture, tolerance in [("estimate", "estimate", 1e-06),
                                       ("std_error", "std_error", 1e-06),
@@ -76,24 +81,24 @@ def test_the_shrunken_estimates_match_rs(fit, tag, null_correlation):
 
 
 def test_every_focal_neighbour_gene_is_present(fit):
-    slopes = pace.pace_shrink(fit, null_correlation=False)
+    slopes = shrink_slopes(fit, null_correlation=False)
     assert len(slopes) == 8 * 8 * 278
     assert set(slopes.focal) == set(fit.cell_types)
     assert set(slopes.neighbour) == set(fit.cell_types)
 
 
 def test_the_term_names_are_the_plain_neighbour_without_a_condition(fit):
-    slopes = pace.pace_shrink(fit, null_correlation=False)
+    slopes = shrink_slopes(fit, null_correlation=False)
     assert set(slopes.term) == set(fit.cell_types)
 
 
 def test_the_reported_standard_error_is_floored_like_rs(fit):
-    slopes = pace.pace_shrink(fit, null_correlation=False)
+    slopes = shrink_slopes(fit, null_correlation=False)
     assert slopes.std_error.min() >= 1e-4
 
 
 def test_the_call_summary_counts_what_it_says(fit):
-    slopes = pace.pace_shrink(fit, null_correlation=False)
+    slopes = shrink_slopes(fit, null_correlation=False)
     summary = slopes.calls()
     assert summary["n_calls"] == int(np.sum(slopes.lfsr < 0.05))
     assert 0 < summary["expected_false_sign"] < summary["n_calls"]
@@ -101,7 +106,7 @@ def test_the_call_summary_counts_what_it_says(fit):
 
 def test_it_can_become_a_dataframe_with_rs_column_names(fit):
     pytest.importorskip("pandas")
-    frame = pace.pace_shrink(fit, null_correlation=False).to_dataframe()
+    frame = shrink_slopes(fit, null_correlation=False).to_dataframe()
     assert list(frame.columns) == ["gene", "focal", "neighbour", "term", "estimate",
                                    "std.error", "estimate_shrunk", "sd_shrunk", "lfsr"]
     assert len(frame) == 8 * 8 * 278
@@ -115,11 +120,11 @@ def test_a_condition_fit_shrinks_the_interaction_term():
     counts = csc_matrix(
         (vec("raw_y_x.txt"), vec("raw_y_i.txt", np.int32), vec("raw_y_p.txt", np.int32)),
         shape=(int(dim[0]), int(dim[1])))
-    conditioned = pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    conditioned = pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                                 lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                                 condition=lines("cond2_label.txt"), condition_name="Arm",
                                 n_threads=1)
-    slopes = pace.pace_shrink(conditioned, null_correlation=False)
+    slopes = shrink_slopes(conditioned, null_correlation=False)
     assert all(term.startswith("ArmPR:") for term in set(slopes.term))
     assert set(slopes.term) == {f"ArmPR:{t}" for t in conditioned.cell_types}
 
@@ -129,9 +134,9 @@ def test_the_responder_term_defaults_to_the_last_level():
     counts = csc_matrix(
         (vec("raw_y_x.txt"), vec("raw_y_i.txt", np.int32), vec("raw_y_p.txt", np.int32)),
         shape=(int(dim[0]), int(dim[1])))
-    conditioned = pace.pace_fit(counts, vec("raw_x.txt"), vec("raw_y.txt"),
+    conditioned = pace.pace_model(counts, vec("raw_x.txt"), vec("raw_y.txt"),
                                 lines("raw_celltype.txt"), genes=lines("raw_genes.txt"),
                                 condition=lines("cond3_label.txt"), condition_name="Arm3",
                                 n_threads=1)
-    slopes = pace.pace_shrink(conditioned, null_correlation=False)
+    slopes = shrink_slopes(conditioned, null_correlation=False)
     assert all(term.startswith("Arm3PR:") for term in set(slopes.term))

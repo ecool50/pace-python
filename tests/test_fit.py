@@ -74,7 +74,7 @@ def inputs():
 
 @pytest.fixture(scope="module")
 def fitted():
-    return pace.fit_irls(**inputs())
+    return pace._core.fit_irls(**inputs())
 
 
 # Why not exact. R passes the solver Rf_trigamma and Python passes the core's

@@ -1,71 +1,67 @@
-"""PACE: Proximity-Associated Changes in Expression.
+"""PACE: proximity-associated changes in expression.
 
-This package binds the same compiled core the R package uses, so results do
-not depend on which language you call it from.
+The same shape as the R package. `pace_fit()` runs everything and hands back
+one object; `pace_model()`, `pace_shrink()`, `pace_decompose()` and
+`pace_drivers()` are the four stages if you want them separately. The readouts
+are attributes of the fit and also functions over it.
 """
 
-from .fit import PaceFit, fit_anndata, pace_fit
-from .shrink import ShrunkenSlopes, pace_shrink
+from .fit import PaceFit, pace_model
+from .pipeline import (
+    cell_contamination,
+    cell_types,
+    fit_state,
+    neighbour_slopes,
+    pace_decompose,
+    pace_drivers,
+    pace_fit,
+    pace_params,
+    pace_shrink,
+    pair_variance,
+    top_drivers,
+    variance_decomposition,
+)
+from .primitives import ambient_field, anchor_genes, build_neighbourhood, compact_fit, stash_pace
 from .stats import FitStatistics, fit_statistics, fitted_means
-from .decompose import (Decomposition, SingleFrameDecomposition, pace_decompose,
-                        pair_variance, single_frame_decomposition)
-from .drivers import DriverTables, PairDrivers, pace_drivers
 from .plots import (plot_decomposition, plot_drivers, plot_pair_heatmap,
                     plot_proximity, plot_shrinkage)
-from ._core import (
-    ambient_field,
-    anchor_mask,
-    centre_within_groups,
-    data_informed_weights,
-    drop_sparse_kernel,
-    group_column_means,
-    same_type_fraction,
-    driver_scores,
-    fit_irls,
-    mash,
-    neighbour_kernels,
-    pair_variance_pratt,
-    sparse_product,
-    standardise,
-    random_design_block,
-)
+from ._core import mash, driver_scores, pair_variance_pratt
 
 __all__ = [
-    "mash",
-    "driver_scores",
-    "pair_variance_pratt",
-    "neighbour_kernels",
-    "ambient_field",
-    "random_design_block",
-    "fit_irls",
-    "sparse_product",
-    "drop_sparse_kernel",
-    "centre_within_groups",
-    "anchor_mask",
-    "data_informed_weights",
-    "standardise",
-    "group_column_means",
-    "same_type_fraction",
+    # the pipeline
     "pace_fit",
-    "fit_anndata",
-    "PaceFit",
+    "pace_model",
     "pace_shrink",
-    "ShrunkenSlopes",
+    "pace_decompose",
+    "pace_drivers",
+    # the readouts
+    "neighbour_slopes",
+    "variance_decomposition",
+    "top_drivers",
+    "pair_variance",
+    "cell_contamination",
+    "anchor_genes",
+    "cell_types",
+    "pace_params",
+    "fit_state",
     "fit_statistics",
     "fitted_means",
-    "FitStatistics",
-    "pace_decompose",
-    "Decomposition",
-    "single_frame_decomposition",
-    "SingleFrameDecomposition",
-    "pair_variance",
-    "pace_drivers",
-    "DriverTables",
-    "PairDrivers",
+    # the figures
     "plot_decomposition",
     "plot_pair_heatmap",
     "plot_drivers",
     "plot_proximity",
     "plot_shrinkage",
+    # constructing and inspecting a fit
+    "build_neighbourhood",
+    "ambient_field",
+    "stash_pace",
+    "compact_fit",
+    "PaceFit",
+    "FitStatistics",
+    # the numerical core, for anyone who wants a stage on its own
+    "mash",
+    "driver_scores",
+    "pair_variance_pratt",
 ]
-__version__ = "0.0.1"
+__version__ = "0.1.0"

@@ -54,18 +54,17 @@ print("cells per type:")
 print(adata.obs["cell_type"].value_counts().sort_index().to_string(), "\n")
 
 # --- the pipeline ----------------------------------------------------------
-fit = pace.fit_anndata(adata, "cell_type", n_threads=1)
+# One call: the model, the shrinkage, both decompositions and the driver
+# tables. The four stages are pace_model/_shrink/_decompose/_drivers if you
+# want to stop partway.
+fit = pace.pace_fit(adata, cell_type="cell_type", null_correlation=True, n_threads=1)
 print(fit, "\n")
 
-slopes = pace.pace_shrink(fit, null_correlation=True)   # R's default
-print(slopes)
-print("  ", slopes.calls(), "\n")
-
-stats = pace.fit_statistics(fit, counts)
-blocks = pace.pace_decompose(fit, counts, stats=stats)
-frame = pace.single_frame_decomposition(fit, counts, blocks)
-drivers = pace.pace_drivers(fit, slopes, blocks, stats)
-pairs = pace.pair_variance(fit, counts, frame)
+slopes = pace.neighbour_slopes(fit)
+frame = pace.variance_decomposition(fit)
+drivers = pace.top_drivers(fit)
+pairs = pace.pair_variance(fit)
+print(slopes, "\n ", slopes.calls(), "\n")
 print(frame, "\n", drivers, "\n")
 
 print("variance by focal type (observed, %):")
@@ -77,10 +76,15 @@ for i in strongest:
     print(f"  {pairs['focal'][i]:<16s} <- {pairs['neighbour'][i]:<16s} {pairs['val'][i]:5.2f}%")
 
 print("\nmacrophage drivers near tumour:")
-print(drivers["Macrophage", "Tumour"].to_dataframe()
+print(pace.top_drivers(fit, "Macrophage", "Tumour").to_dataframe()
       .loc[:, ["rank", "gene", "driver_score", "b_clean", "spec", "lfsr"]]
       .round(4).to_string(index=False))
 
+print("\ncontamination, median fraction by type:")
+print(pace.cell_contamination(fit).groupby("celltype")["contam_fraction"]
+      .median().round(4).to_string())
+
+counts = adata.X
 # --- the figures -----------------------------------------------------------
 # Each panel on its own, and all four as one multi-page PDF. PdfPages keeps
 # every page vector rather than stitching rasters together.

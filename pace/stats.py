@@ -33,6 +33,7 @@ class FitStatistics:
     mu_mean: np.ndarray      # types x genes, mean fitted mean
     toff_var: np.ndarray     # types x genes, variance of the contamination offset
     has_contamination: bool
+    contam_fraction: np.ndarray | None = None   # per cell, the share of mu
 
     def __repr__(self) -> str:
         return (f"FitStatistics({len(self.cell_types)} cell types, {len(self.genes)} genes, "
@@ -92,6 +93,10 @@ def fit_statistics(fit, counts, *, max_block_entries=5_000_000):
     mu_mean = np.zeros((n_types, n_genes))
     toff_var = np.full((n_types, n_genes), np.nan)
     any_contamination = False
+    # accumulated across blocks so the fraction costs nothing extra: it is
+    # sum_g mu_spill / sum_g mu, per cell
+    spill_total = np.zeros(n_cells)
+    mu_total = np.zeros(n_cells)
 
     for start in range(0, n_genes, per_block):
         columns = np.arange(start, min(start + per_block, n_genes))
@@ -103,6 +108,8 @@ def fit_statistics(fit, counts, *, max_block_entries=5_000_000):
             # the contamination's share, on the scale the model adds it
             offset = np.log1p(mu_spill / mu_bio)
             any_contamination = any_contamination or bool(np.any(mu_spill > 0))
+            spill_total += mu_spill.sum(axis=1)
+        mu_total += total.sum(axis=1)
         for t in range(n_types):
             cells = fit.type_code == t
             if not cells.any():
@@ -111,6 +118,8 @@ def fit_statistics(fit, counts, *, max_block_entries=5_000_000):
             if offset is not None:
                 toff_var[t, columns] = offset[cells, :].var(axis=0, ddof=1)
 
+    fraction = (spill_total / np.maximum(mu_total, 1e-9)) if any_contamination else None
     return FitStatistics(cell_types=list(fit.cell_types), genes=list(fit.genes),
                          n_cells=sizes, mu_mean=mu_mean, toff_var=toff_var,
-                         has_contamination=any_contamination)
+                         has_contamination=any_contamination,
+                         contam_fraction=fraction)

@@ -29,21 +29,26 @@ are optional, imported only when you reach for the thing that uses them.
 
 ## Quickstart
 
+One call fits the model and every reporting layer:
+
 ```python
 import pace
 
-fit     = pace.fit_anndata(adata, "cell_type")
-slopes  = pace.pace_shrink(fit)
-stats   = pace.fit_statistics(fit, counts)
-blocks  = pace.pace_decompose(fit, counts, stats=stats)
-frame   = pace.single_frame_decomposition(fit, counts, blocks)
-drivers = pace.pace_drivers(fit, slopes, blocks, stats)
-pairs   = pace.pair_variance(fit, counts, frame)
-
-drivers["Macrophage", "Tumour"].to_dataframe().head()
+fit = pace.pace_fit(adata, cell_type="cell_type")
 ```
 
-On a breast cancer Xenium section, that last line gives:
+The readouts then come off the fit, as attributes or as functions:
+
+```python
+pace.neighbour_slopes(fit)        # every slope, with a local false sign rate
+pace.variance_decomposition(fit)  # where each gene's variance comes from
+pace.top_drivers(fit, "Macrophage", "Tumour")
+pace.pair_variance(fit)           # which neighbours matter to which types
+pace.cell_contamination(fit)      # per cell, how much is its neighbours'
+```
+
+`pace.top_drivers(fit, "Macrophage", "Tumour").to_dataframe().head()` on a
+breast cancer Xenium section:
 
 ```
  rank   gene  driver_score  b_clean   spec   lfsr
@@ -64,13 +69,27 @@ From plain arrays instead of an `AnnData`:
 fit = pace.pace_fit(counts, x, y, cell_type)   # counts is cells by genes
 ```
 
+### The four stages
+
+`pace_fit()` runs these in turn. Call them yourself to stop partway, or to
+re-run a later stage with different settings:
+
+```python
+fit = pace.pace_model(adata, cell_type="cell_type")   # the model alone
+fit = pace.pace_shrink(fit, null_correlation=False)
+fit = pace.pace_decompose(fit, counts)
+fit = pace.pace_drivers(fit)
+```
+
+Each takes a fit and returns it with one more layer attached.
+
 ## The readouts
 
-**`pace_fit` / `fit_anndata` — the model.** One slope per
+**`pace_model` — the model.** One slope per
 (focal type, neighbour type, gene), with a per-cell contamination loading and
-gene-wise overdispersions. `fit_anndata` reads coordinates from
-`obsm["spatial"]`, labels from `obs`, gene names from `var_names` and counts
-from `X` or a `layer`, and never modifies the object.
+gene-wise overdispersions. Given an `AnnData` it reads coordinates from
+`obsm["spatial"]`, labels and condition from `obs`, gene names from
+`var_names` and counts from `X` or a `layer`, and never modifies it.
 
 **`pace_shrink` — which slopes to believe.** Raw slopes are mostly noise.
 Multivariate adaptive shrinkage pools them, one mixture per neighbour type
@@ -97,6 +116,13 @@ type's spatial variance split across its neighbours, so a row sums to that
 type's spatial share and the own-type pair is excluded.
 
 **`plot_*`** — five figures over the above.
+
+Three more: `build_neighbourhood()` and `ambient_field()` return the kernels
+and the contamination field without fitting, for checking what the model is
+being given; `anchor_genes()` lists the genes that mark each type and so
+anchor its contamination; `stash_pace()` copies the readouts into
+`adata.uns`, and `compact_fit()` drops the rebuildable bulk from a fit you
+want to keep.
 
 ## Figures
 
