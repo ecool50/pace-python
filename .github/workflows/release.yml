@@ -15,7 +15,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-14]
+        # No macos-13. The arm64 runner cross-compiles both macOS
+        # architectures already -- [tool.cibuildwheel.macos] asks for
+        # x86_64 and arm64 -- so an Intel runner only duplicates it, and
+        # GitHub has retired those anyway: the job sat queued for an hour
+        # and was never scheduled.
+        #
+        # The cost is that the x86_64 macOS wheels are cross-compiled and so
+        # cannot be run on the builder; they are built but not test-fitted.
+        # Every other wheel is.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-14]
     steps:
       - uses: actions/checkout@v4
       - uses: pypa/cibuildwheel@v2.21
