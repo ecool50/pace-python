@@ -3,7 +3,7 @@ PACE
 A hierarchical empirical Bayes framework for `proximity-associated changes in expression` — how a cell's gene
 expression shifts near specific neighbouring cell types — in `imaging-based spatial transcriptomics` (Xenium, CosMx).
 
-<img src="docs/figures/pace_overview.png" alt="Overview of the PACE framework" align="middle" height="622" width="1000">
+![Overview of the PACE framework](https://raw.githubusercontent.com/ecool50/pace-python/main/docs/figures/pace_overview.png)
 
 Overview
 --------
