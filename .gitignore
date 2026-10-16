@@ -17,3 +17,5 @@ examples/*.pdf
 eigen-3.4.0/
 eigen.tar.gz
 wheelhouse/
+docs/_build/
+docs/generated/

@@ -1,6 +1,6 @@
 # Using PACE
 
-The [README](../README.md) is the short version. This is the reference: what
+The [overview](index.md) is the short version. This is the reference: what
 each readout gives you, the figures, and the handful of settings worth
 knowing about.
 
