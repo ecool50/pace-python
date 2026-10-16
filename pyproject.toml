@@ -57,6 +57,12 @@ build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
 # musl and the minority architectures are not worth the build minutes until
 # someone asks; 32-bit cannot hold a real cohort anyway.
 skip = "*-musllinux_* *_i686 *_ppc64le *_s390x pp*"
+# manylinux2014 (glibc 2.17) is cibuildwheel's default and is now older than
+# SciPy's wheels, so installing the built wheel for its test found no scipy
+# binary and tried to compile it, which wants OpenBLAS the container has not
+# got. 2_28 is what SciPy itself ships against.
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
 before-all = "bash tools/fetch_eigen.sh"
 environment = { EIGEN_INCLUDE_DIR = "$(pwd)/eigen-3.4.0" }
 # A wheel that imports and fits is the least that should be checked; the full
