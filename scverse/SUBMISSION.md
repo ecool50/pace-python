@@ -21,10 +21,12 @@ in the PR description.
       are each held to the R package's own output on a packaged breast cancer
       Xenium crop, and the fit is asserted bit-identical.
 - [x] **CI automatically executes these tests on each push or pull request.**
-      `.github/workflows/test.yml`, Linux and macOS, Python 3.10 and 3.12.
+      `.github/workflows/test.yml`: Linux x86-64, Linux arm64 and macOS arm64,
+      Python 3.10 and 3.12, six jobs, all green.
 - [x] **The package provides API documentation via a website or README.**
-      `README.md` documents every entry point, with a worked end-to-end
-      example; `examples/demo.py` runs the whole pipeline.
+      <https://ecool50.github.io/pace-python/> — an overview, a worked
+      example, and a reference page per public function generated from the
+      docstrings. Built and deployed by `.github/workflows/docs.yml`.
 - [x] **The package uses scverse datastructures where appropriate.**
       `pace.fit_anndata(adata, "cell_type")` reads the counts from `X` or a
       layer, coordinates from `obsm["spatial"]`, labels from `obs` and gene
