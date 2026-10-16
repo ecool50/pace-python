@@ -39,7 +39,16 @@ jobs:
           python -m pip install ".[docs]"
 
       - name: Build
-        run: python -m sphinx -b html docs docs/_build/html -W --keep-going
+        # From outside the checkout, as the test workflow does and for the
+        # same reason: the repository root holds the source package `pace/`,
+        # which shadows the installed one on sys.path but carries no compiled
+        # _core, and autodoc then fails with an ImportError that blames a
+        # circular import.
+        working-directory: ${{ runner.temp }}
+        run: >
+          python -m sphinx -b html
+          "$GITHUB_WORKSPACE/docs" "$GITHUB_WORKSPACE/docs/_build/html"
+          -W --keep-going
 
       - uses: actions/upload-pages-artifact@v3
         with:

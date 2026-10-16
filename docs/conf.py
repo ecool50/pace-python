@@ -3,11 +3,13 @@
 Same shape as that site -- an introduction, a reference built from the
 docstrings, and the worked example -- so the two read alike.
 """
-import sys
 from datetime import date
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Deliberately no sys.path manipulation. The usual boilerplate puts the
+# repository root on the path, which here shadows the INSTALLED package with
+# the source directory -- and that directory holds no compiled _core, so
+# autodoc fails with an ImportError blaming a circular import. The package is
+# installed before this runs; let the import find it.
 
 project = "PACE"
 author = "Elijah Willie"
