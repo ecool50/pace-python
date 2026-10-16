@@ -61,7 +61,10 @@ before-all = "bash tools/fetch_eigen.sh"
 environment = { EIGEN_INCLUDE_DIR = "$(pwd)/eigen-3.4.0" }
 # A wheel that imports and fits is the least that should be checked; the full
 # suite needs the fixtures, which the sdist deliberately leaves out.
-test-requires = ["pytest", "pandas", "anndata", "matplotlib"]
+#
+# No test-requires: the check below needs only numpy and scipy, which the
+# wheel already depends on. Asking for anndata here pulled in h5py, which has
+# to compile against HDF5 inside the manylinux container and does not.
 test-command = "python -c \"import pace, numpy as np; from scipy.sparse import csc_matrix; r=np.random.default_rng(0); n=300; print(pace.pace_fit(csc_matrix(r.poisson(2,size=(n,10)).astype(float)), r.uniform(0,200,n), r.uniform(0,200,n), r.choice(['A','B'],n), n_threads=1))\""
 
 [tool.cibuildwheel.macos]

@@ -104,8 +104,23 @@ def check_eigen_version(include_dir):
 # relative to this file. It still compiles the one shared copy; nothing is
 # duplicated into the Python tree.
 CORE = Path("src") / "core"
-EIGEN = eigen_include()
-check_eigen_version(EIGEN)
+
+class BuildExtWithEigen(build_ext):
+    """Find Eigen when compiling, rather than when setup.py is imported.
+
+    Only the extension needs Eigen. Resolving it at import time made every
+    other command need it too, so `python -m build --sdist` -- which just
+    packages source files, on a machine that may have no compiler at all --
+    died with "Eigen headers not found".
+    """
+
+    def build_extensions(self):
+        include = eigen_include()
+        check_eigen_version(include)
+        for extension in self.extensions:
+            extension.include_dirs.append(include)
+        super().build_extensions()
+
 
 ext_modules = [
     Pybind11Extension(
@@ -130,7 +145,8 @@ ext_modules = [
             str(CORE / "irls_chunk.cpp"),
             str(CORE / "irls_driver.cpp"),
         ],
-        include_dirs=[str(CORE), EIGEN],
+        # Eigen is appended by BuildExtWithEigen, at build time
+        include_dirs=[str(CORE)],
         # The R package passes this through configure and the core depends on
         # it: fused multiply-add changes the arithmetic, and a fit must not
         # depend on which language called it. Without it the random effects
@@ -140,4 +156,4 @@ ext_modules = [
     )
 ]
 
-setup(cmdclass={"build_ext": build_ext}, ext_modules=ext_modules)
+setup(cmdclass={"build_ext": BuildExtWithEigen}, ext_modules=ext_modules)
