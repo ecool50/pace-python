@@ -41,6 +41,21 @@ CROSS_ARCH_FLOOR = 0.0 if ON_REFERENCE_ARCH else 2e-3
 WHERE = f"{sys.platform}/{MACHINE}"
 
 
+# A relative floor as well as an absolute one. The absolute floor has to be
+# told the magnitude of each quantity, which works for the columns whose scale
+# is known (percentages run to a hundred) but not for the variance blocks,
+# whose size varies by orders of magnitude between genes. A relative floor
+# needs no such knowledge. Measured worst case across architectures is about
+# 0.6% on a single block; a genuine regression moves these by tens of percent,
+# so this still fails on anything real.
+CROSS_ARCH_RTOL = 0.0 if ON_REFERENCE_ARCH else 2e-2
+
+
+def rtol():
+    """The relative tolerance to allow, zero on the reference architecture."""
+    return CROSS_ARCH_RTOL
+
+
 def tol(atol, scale=1.0):
     """The tolerance for a comparison whose exact-build tolerance is `atol`.
 

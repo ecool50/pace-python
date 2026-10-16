@@ -12,7 +12,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 

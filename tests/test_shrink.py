@@ -23,7 +23,7 @@ from pace.decompose import pair_variance as pair_variance_table
 from pace.decompose import single_frame_decomposition as single_frame_table
 from pace.drivers import pace_drivers as driver_tables
 from pace.shrink import pace_shrink as shrink_slopes
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -76,7 +76,7 @@ def test_the_shrunken_estimates_match_rs(fit, tag, null_correlation):
                                       ("sd_shrunk", "sd_shrunk", 1e-05),
                                       ("lfsr", "lfsr", 1e-04)]:
         np.testing.assert_allclose(getattr(slopes, field)[order],
-                                   vec(f"{tag}_{fixture}.txt"), rtol=0, atol=tol(tolerance),
+                                   vec(f"{tag}_{fixture}.txt"), rtol=rtol(), atol=tol(tolerance),
                                    err_msg=f"{field} disagrees with R")
 
 

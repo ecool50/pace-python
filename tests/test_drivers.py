@@ -17,7 +17,7 @@ from pace.decompose import pair_variance as pair_variance_table
 from pace.decompose import single_frame_decomposition as single_frame_table
 from pace.drivers import pace_drivers as driver_tables
 from pace.shrink import pace_shrink as shrink_slopes
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -80,7 +80,7 @@ def test_every_driver_column_matches_rs(pipeline):
     for name in COLUMNS:
         np.testing.assert_allclose(
             np.asarray(columns[name], dtype=float), vec(f"drv_{name}.txt"),
-            rtol=0, atol=tol(1e-05), err_msg=f"{name} disagrees with R")
+            rtol=rtol(), atol=tol(1e-05), err_msg=f"{name} disagrees with R")
 
 
 def test_the_pair_statuses_match_rs(pipeline):

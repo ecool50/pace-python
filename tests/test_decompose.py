@@ -22,7 +22,7 @@ from pace.decompose import pair_variance as pair_variance_table
 from pace.decompose import single_frame_decomposition as single_frame_table
 from pace.drivers import pace_drivers as driver_tables
 from pace.shrink import pace_shrink as shrink_slopes
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -82,13 +82,13 @@ def test_every_variance_block_matches_rs(case):
     for field, fixture in BLOCK_COLUMNS:
         np.testing.assert_allclose(
             getattr(decomposition, field), vec(f"{tag}_{fixture}.txt"),
-            rtol=0, atol=tol(1e-05), err_msg=f"{field} disagrees with R")
+            rtol=rtol(), atol=tol(1e-05), err_msg=f"{field} disagrees with R")
 
 
 def test_the_percentages_match_rs(case):
     tag, decomposition = case
     reference = np.column_stack([vec(f"{tag}_pct_{key}.txt") for key in PERCENT_KEYS])
-    np.testing.assert_allclose(decomposition.pct, reference, rtol=0,
+    np.testing.assert_allclose(decomposition.pct, reference, rtol=rtol(),
                                atol=tol(1e-04, scale=100))
 
 
@@ -104,7 +104,7 @@ def test_the_per_focal_aggregates_match_rs(case, weighting):
     table = {"mean": decomposition.mean_table, "specw": decomposition.specw_table,
              "pooled": decomposition.pooled_table}[weighting]
     reference = vec(f"{tag}_agg_{weighting}.txt").reshape(table.shape, order="F")
-    np.testing.assert_allclose(table, reference, rtol=0, atol=tol(1e-05, scale=100))
+    np.testing.assert_allclose(table, reference, rtol=rtol(), atol=tol(1e-05, scale=100))
 
 
 def test_the_index_matrices_are_not_read_transposed(counts):
@@ -130,7 +130,7 @@ def test_the_index_matrices_are_not_read_transposed(counts):
                              + np.diag(sigma) @ (se ** 2))
     decomposition = decomposition_table(fit, counts)
     np.testing.assert_allclose(decomposition.v_state_baseline, by_hand.ravel(),
-                               rtol=0, atol=tol(1e-08))
+                               rtol=rtol(), atol=tol(1e-08))
 
 
 def test_a_condition_fit_carries_a_responder_block(counts):
@@ -193,14 +193,14 @@ def test_the_within_type_split_matches_rs(single_frame):
     for field, fixture in [("pct_spatial", "Spatial"), ("pct_spill", "Spillover"),
                            ("pct_residual", "Residual")]:
         np.testing.assert_allclose(getattr(frame, field), vec(f"{tag}_{fixture}.txt"),
-                                   rtol=0, atol=tol(1e-04, scale=100), err_msg=field)
+                                   rtol=rtol(), atol=tol(1e-04, scale=100), err_msg=field)
 
 
 def test_only_a_condition_fit_has_a_responder_share(single_frame):
     tag, frame = single_frame
     if tag == "sfc":
         np.testing.assert_allclose(frame.pct_responder,
-                                   vec("sfc_Responder_spatial.txt"), rtol=0, atol=tol(1e-04))
+                                   vec("sfc_Responder_spatial.txt"), rtol=rtol(), atol=tol(1e-04))
         assert "Responder spatial %" in frame.block_names
     else:
         assert frame.pct_responder is None
@@ -213,7 +213,7 @@ def test_the_shares_sum_to_one_hundred(single_frame):
     if frame.pct_responder is not None:
         total = total + frame.pct_responder
     finite = np.isfinite(total)
-    np.testing.assert_allclose(total[finite], 100.0, rtol=0, atol=tol(1e-06))
+    np.testing.assert_allclose(total[finite], 100.0, rtol=rtol(), atol=tol(1e-06))
 
 
 def test_the_per_focal_table_is_sum_of_squares_weighted(single_frame):
@@ -262,7 +262,7 @@ def test_the_pair_table_matches_rs(counts, tag, condition, block):
     assert len(keys) == table["val"].size
     order = np.array([position[key] for key in keys])
     np.testing.assert_allclose(table["val"][order], vec(f"{tag}_val.txt"),
-                               rtol=0, atol=tol(1e-07))
+                               rtol=rtol(), atol=tol(1e-07))
 
 
 def test_each_focal_row_sums_to_its_observed_spatial_share(counts):

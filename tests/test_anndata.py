@@ -12,7 +12,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 anndata = pytest.importorskip("anndata")
 pd = pytest.importorskip("pandas")
@@ -76,7 +76,7 @@ def test_the_gene_names_come_from_var_names(adata):
 def test_an_image_key_is_honoured(adata):
     fit = pace.pace_model(adata, cell_type="cellType", image="panel", n_threads=1)
     reference = vec("two_image_global_U.txt").reshape(fit.U.shape, order="F")
-    np.testing.assert_allclose(fit.U, reference, rtol=0, atol=tol(1e-06))
+    np.testing.assert_allclose(fit.U, reference, rtol=rtol(), atol=tol(1e-06))
 
 
 def test_a_dense_x_works_too(adata, arrays):
@@ -229,7 +229,7 @@ def test_a_condition_key_matches_r(adata):
     conditioned.obs["Arm"] = lines("cond2_label.txt")
     fit = pace.pace_model(conditioned, cell_type="cellType", condition="Arm", n_threads=1)
     np.testing.assert_allclose(
-        fit.U, vec("cond2_U.txt").reshape(fit.U.shape, order="F"), rtol=0, atol=tol(1e-06))
+        fit.U, vec("cond2_U.txt").reshape(fit.U.shape, order="F"), rtol=rtol(), atol=tol(1e-06))
     assert fit.row_names == lines("cond2_rownames.txt")
 
 

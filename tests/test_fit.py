@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 import pace
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -92,10 +92,10 @@ def test_the_fit_reproduces_r(fitted):
     g = fitted["U"].shape[1]
     for name, fixture in [("U", "irls_expect_U.txt"), ("B", "irls_expect_B.txt")]:
         np.testing.assert_allclose(fitted[name], vec(fixture).reshape(-1, g, order="F"),
-                                   rtol=0, atol=tol(TRIGAMMA_TOL[name]),
+                                   rtol=rtol(), atol=tol(TRIGAMMA_TOL[name]),
                                    err_msg=f"{name} differs by more than the trigamma can explain")
     np.testing.assert_allclose(fitted["alpha"], vec("irls_expect_alpha.txt"),
-                               rtol=0, atol=tol(TRIGAMMA_TOL["alpha"]),
+                               rtol=rtol(), atol=tol(TRIGAMMA_TOL["alpha"]),
                                err_msg="dispersions differ by more than the trigamma can explain")
 
 

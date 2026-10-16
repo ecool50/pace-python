@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 import pace
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 

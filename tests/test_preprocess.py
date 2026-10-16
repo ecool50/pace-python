@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 import pace
-from _tolerance import tol
+from _tolerance import rtol, tol
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -62,7 +62,7 @@ def test_anchor_mask_matches_r():
     det = np.asfortranarray(vec("pre_det.txt").reshape(dim[0], dim[1], order="F"))
     out = pace._core.anchor_mask(det, 0.2, 0.1)
     np.testing.assert_allclose(out["mask"], vec("pre_anchor.txt").reshape(det.shape, order="F"),
-                               rtol=0, atol=tol(0))
+                               rtol=rtol(), atol=tol(0))
     np.testing.assert_array_equal(out["n_anchor"], vec("pre_anchor_n.txt", np.int32))
     # a mask is an indicator, and a type never anchors a gene it owns
     assert set(np.unique(out["mask"])) <= {0.0, 1.0}

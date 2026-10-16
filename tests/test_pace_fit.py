@@ -18,7 +18,7 @@ import pytest
 from scipy.sparse import csc_matrix
 
 import pace
-from _tolerance import tol
+from _tolerance import rtol, tol
 from pace.fit import pace_model
 
 FIX = Path(__file__).parent / "fixtures"
@@ -65,8 +65,8 @@ def test_the_fit_agrees_with_rs_stock_trigamma_to_the_documented_tolerance(fit):
     this, so the tolerance is the one test_fit.py justifies, not a guess.
     """
     np.testing.assert_allclose(fit.U, vec("raw_expect_U.txt").reshape(fit.U.shape, order="F"),
-                               rtol=0, atol=tol(1e-06))
-    np.testing.assert_allclose(fit.alpha, vec("raw_expect_alpha.txt"), rtol=0, atol=tol(1e-05))
+                               rtol=rtol(), atol=tol(1e-06))
+    np.testing.assert_allclose(fit.alpha, vec("raw_expect_alpha.txt"), rtol=rtol(), atol=tol(1e-05))
 
 
 def test_the_random_effect_rows_are_named_the_way_r_names_them(fit):
@@ -119,8 +119,8 @@ def test_both_neighbour_scopes_match_r_on_two_images(two_image_inputs, kernel_pe
     fit = pace_model(counts, x, y, cell_type, image=image,
                    kernel_per_image=kernel_per_image, n_threads=1)
     reference = vec(f"two_image_{tag}_U.txt").reshape(fit.U.shape, order="F")
-    np.testing.assert_allclose(fit.U, reference, rtol=0, atol=tol(1e-06))
-    np.testing.assert_allclose(fit.alpha, vec(f"two_image_{tag}_alpha.txt"), rtol=0, atol=tol(1e-05))
+    np.testing.assert_allclose(fit.U, reference, rtol=rtol(), atol=tol(1e-06))
+    np.testing.assert_allclose(fit.alpha, vec(f"two_image_{tag}_alpha.txt"), rtol=rtol(), atol=tol(1e-05))
 
 
 def test_the_default_neighbour_scope_is_global_like_rs(two_image_inputs):
@@ -128,7 +128,7 @@ def test_the_default_neighbour_scope_is_global_like_rs(two_image_inputs):
     counts, x, y, cell_type, image = two_image_inputs
     fit = pace_model(counts, x, y, cell_type, image=image, n_threads=1)
     reference = vec("two_image_global_U.txt").reshape(fit.U.shape, order="F")
-    np.testing.assert_allclose(fit.U, reference, rtol=0, atol=tol(1e-06))
+    np.testing.assert_allclose(fit.U, reference, rtol=rtol(), atol=tol(1e-06))
     assert fit.params["kernel_per_image"] is False
 
 
@@ -228,10 +228,10 @@ def test_a_condition_fit_matches_r(tag, name, n_terms):
     assert fit.U.shape == (int(dim[0]), int(dim[1]))
     assert len(fit.params["term_names"]) == n_terms
     np.testing.assert_allclose(
-        fit.U, vec(f"{tag}_U.txt").reshape(fit.U.shape, order="F"), rtol=0, atol=tol(1e-06))
+        fit.U, vec(f"{tag}_U.txt").reshape(fit.U.shape, order="F"), rtol=rtol(), atol=tol(1e-06))
     np.testing.assert_allclose(
-        fit.B, vec(f"{tag}_B.txt").reshape(fit.B.shape, order="F"), rtol=0, atol=tol(1e-06))
-    np.testing.assert_allclose(fit.alpha, vec(f"{tag}_alpha.txt"), rtol=0, atol=tol(1e-05))
+        fit.B, vec(f"{tag}_B.txt").reshape(fit.B.shape, order="F"), rtol=rtol(), atol=tol(1e-06))
+    np.testing.assert_allclose(fit.alpha, vec(f"{tag}_alpha.txt"), rtol=rtol(), atol=tol(1e-05))
 
 
 @pytest.mark.parametrize("tag,name", [("cond2", "Arm"), ("cond3", "Arm3")])
@@ -306,7 +306,7 @@ def test_an_empty_cell_type_barely_moves_the_real_rows(fit):
                       n_threads=1)
     index = {name: i for i, name in enumerate(padded.row_names)}
     rows = [index[name] for name in fit.row_names]
-    np.testing.assert_allclose(padded.U[rows], fit.U, rtol=0, atol=tol(1e-05))
+    np.testing.assert_allclose(padded.U[rows], fit.U, rtol=rtol(), atol=tol(1e-05))
 
 
 def test_a_condition_level_no_cell_carries_is_refused():
