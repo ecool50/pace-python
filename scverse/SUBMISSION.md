@@ -9,12 +9,13 @@ in the PR description.
 
 - [x] **The code is publicly available under an OSI-approved license.**
       GPL-3.0-or-later, `LICENSE` in the repository root.
-- [ ] **The package provides versioned releases.**
-      Pending the first tagged release.
-- [ ] **The package can be installed from a standard registry.**
-      Pending publication of `pace-spatial` to PyPI. Wheels are built by
-      `.github/workflows/release.yml` for Linux and macOS on x86-64 and arm64,
-      so installing does not require a compiler.
+- [x] **The package provides versioned releases.**
+      `v0.1.0`, tagged and built by `.github/workflows/release.yml`.
+- [x] **The package can be installed from a standard registry.**
+      <https://pypi.org/project/pace-spatial/> — `pip install pace-spatial`.
+      Twenty wheels, CPython 3.9 to 3.13 on Linux and macOS, x86-64 and
+      arm64, published by trusted publishing, so installing needs no
+      compiler. An sdist is there for anything else.
 - [x] **Automated tests cover essential functions and a reasonable range of
       inputs.** 166 tests. They are not smoke tests: the fit, the shrinkage,
       both variance decompositions, the driver tables and the pair attribution
