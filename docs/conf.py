@@ -14,7 +14,7 @@ from datetime import date
 project = "PACE"
 author = "Elijah Willie"
 copyright = f"{date.today().year}, Elijah Willie"
-release = "0.1.0"
+release = "0.1.1"
 
 extensions = [
     "sphinx.ext.autodoc",

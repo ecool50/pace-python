@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pace-spatial"
-version = "0.1.0"
+version = "0.1.1"
 description = "PACE: proximity-associated changes in expression, for imaging spatial transcriptomics"
 readme = "README.md"
 requires-python = ">=3.9"
